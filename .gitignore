@@ -4,3 +4,4 @@ obj/
 .vs/
 phoneedge.log*
 phoneedge.json
+.superpowers/
