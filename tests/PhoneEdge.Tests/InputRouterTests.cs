@@ -212,4 +212,21 @@ public class InputRouterTests
         r.OnRawMouseMove(0, 1); // now at bottom (W-1) of the rotated display: nothing applied
         Assert.Empty(s.Mouse);
     }
+
+    [Fact]
+    public void ModeChanged_is_raised_outside_the_lock()
+    {
+        var (r, _, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        bool otherThreadGotIn = false;
+        r.ModeChanged += _ =>
+        {
+            var t = new Thread(() => { r.OnRawMouseButton(HidMouseButtons.Left, true); otherThreadGotIn = true; });
+            t.Start();
+            Assert.True(t.Join(TimeSpan.FromSeconds(2)), "a second thread must be able to enter the router while ModeChanged runs");
+        };
+        PushIn(r, k);
+        Assert.True(r.OnPhone);
+        Assert.True(otherThreadGotIn);
+    }
 }

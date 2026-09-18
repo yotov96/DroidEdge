@@ -25,6 +25,7 @@ public sealed class InputRouter
     private HidMouseButtons _buttons;
     private int _wheelAcc, _panAcc;
     private int _cursorX, _cursorY;
+    private bool? _pendingModeChange;
 
     public InputRouter(AppConfig cfg, IntRect monitor, IntRect edgeSegment, ICursor cursor, IInputGate gate, IReportSink sink, IClock clock, Action<string>? log = null)
     {
@@ -64,6 +65,7 @@ public sealed class InputRouter
             PhoneReady = false;
             _phone = null;
         }
+        FlushModeChanged();
     }
 
     public void UpdatePhoneBounds(int width, int height)
@@ -89,26 +91,33 @@ public sealed class InputRouter
     {
         lock (_lock)
         {
-            if (!OnPhone)
-            {
-                if (!PhoneReady || _phone is null) return;
-                bool pushing = EdgeGeometry.IsPushingOut(_cfg.Edge, _segment, _cursorX, _cursorY, dx, dy);
-                if (_enter.Sample(pushing, _clock.NowMs)) EnterPhone();
-                return;
-            }
+            OnRawMouseMoveLocked(dx, dy);
+        }
+        FlushModeChanged();
+    }
 
-            var (adx, ady) = _phone!.Move(dx, dy);
-            bool back = EdgeGeometry.IsPushingBack(_cfg.Edge, _phone, dx, dy);
-            if (_exit.Sample(back, _clock.NowMs))
-            {
-                ReturnToPcCore(sendReleases: true);
-                return;
-            }
-            if (adx != 0 || ady != 0)
-            {
-                foreach (var (cx, cy) in MoveChunker.Chunk(adx, ady))
-                    _sink.SendMouse(MouseReport.Encode(_buttons, cx, cy, 0, 0));
-            }
+    // Caller holds _lock.
+    private void OnRawMouseMoveLocked(int dx, int dy)
+    {
+        if (!OnPhone)
+        {
+            if (!PhoneReady || _phone is null) return;
+            bool pushing = EdgeGeometry.IsPushingOut(_cfg.Edge, _segment, _cursorX, _cursorY, dx, dy);
+            if (_enter.Sample(pushing, _clock.NowMs)) EnterPhone();
+            return;
+        }
+
+        var (adx, ady) = _phone!.Move(dx, dy);
+        bool back = EdgeGeometry.IsPushingBack(_cfg.Edge, _phone, dx, dy);
+        if (_exit.Sample(back, _clock.NowMs))
+        {
+            ReturnToPcCore(sendReleases: true);
+            return;
+        }
+        if (adx != 0 || ady != 0)
+        {
+            foreach (var (cx, cy) in MoveChunker.Chunk(adx, ady))
+                _sink.SendMouse(MouseReport.Encode(_buttons, cx, cy, 0, 0));
         }
     }
 
@@ -154,6 +163,7 @@ public sealed class InputRouter
     public void ReturnToPc()
     {
         lock (_lock) ReturnToPcCore(sendReleases: true);
+        FlushModeChanged();
     }
 
     // Caller holds _lock.
@@ -174,7 +184,7 @@ public sealed class InputRouter
         foreach (var (cx, cy) in MoveChunker.Resync(_phone.Width, _phone.Height, tx, ty))
             _sink.SendMouse(MouseReport.Encode(HidMouseButtons.None, cx, cy, 0, 0));
         _log($"Entered phone at ({tx},{ty}) from PC ({_cursorX},{_cursorY})");
-        ModeChanged?.Invoke(true);
+        _pendingModeChange = true;
     }
 
     // Caller holds _lock. Idempotent.
@@ -200,6 +210,18 @@ public sealed class InputRouter
         _buttons = HidMouseButtons.None;
         _keyboard.ReleaseAll();
         _log("Returned to PC");
-        ModeChanged?.Invoke(false);
+        _pendingModeChange = false;
+    }
+
+    // Called after the lock is released so subscribers can block or call back into the router safely.
+    private void FlushModeChanged()
+    {
+        bool? change;
+        lock (_lock)
+        {
+            change = _pendingModeChange;
+            _pendingModeChange = null;
+        }
+        if (change is bool c) ModeChanged?.Invoke(c);
     }
 }
