@@ -4,4 +4,6 @@ obj/
 .vs/
 phoneedge.log*
 phoneedge.json
+phoneedge-diag.txt
+dist/
 .superpowers/
