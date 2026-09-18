@@ -57,6 +57,23 @@ public class InputRouterTests
     }
 
     [Fact]
+    public void Enters_when_hook_reports_cursor_beyond_the_edge()
+    {
+        // Real WH_MOUSE_LL positions while pushing against the left edge are negative (unclipped).
+        var (r, _, c, g, k) = Make();
+        r.SetPhoneReady(W, H);
+        for (int t = 0; t <= 1100 && !r.OnPhone; t += 50)
+        {
+            r.OnCursorMoved(-(1 + t / 50), 540);
+            k.NowMs = t;
+            r.OnRawMouseMove(-4, 0);
+        }
+        Assert.True(r.OnPhone);
+        Assert.True(g.Swallow);
+        Assert.Equal((1, 540), c.Pos);
+    }
+
+    [Fact]
     public void Enters_after_dwell_parks_cursor_and_resyncs_phone_cursor()
     {
         var (r, s, c, g, k) = Make();

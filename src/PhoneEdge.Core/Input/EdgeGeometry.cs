@@ -2,15 +2,24 @@ namespace PhoneEdge.Core.Input;
 
 public static class EdgeGeometry
 {
+    /// <summary>
+    /// True when the cursor is on (or reported beyond) the configured edge, within the segment's span, and the
+    /// delta points outward. WH_MOUSE_LL reports the unclipped position, so pushing past the left edge yields
+    /// negative x values; those count as "on the edge".
+    /// </summary>
     public static bool IsPushingOut(Edge edge, IntRect segment, int cx, int cy, int dx, int dy)
     {
-        if (!segment.Contains(cx, cy)) return false;
+        bool vertical = edge is Edge.Left or Edge.Right;
+        bool inSpan = vertical
+            ? cy >= segment.Top && cy < segment.Bottom
+            : cx >= segment.Left && cx < segment.Right;
+        if (!inSpan) return false;
         return edge switch
         {
-            Edge.Left => cx == segment.Left && dx < 0,
-            Edge.Right => cx == segment.Right - 1 && dx > 0,
-            Edge.Top => cy == segment.Top && dy < 0,
-            Edge.Bottom => cy == segment.Bottom - 1 && dy > 0,
+            Edge.Left => cx <= segment.Left && dx < 0,
+            Edge.Right => cx >= segment.Right - 1 && dx > 0,
+            Edge.Top => cy <= segment.Top && dy < 0,
+            Edge.Bottom => cy >= segment.Bottom - 1 && dy > 0,
             _ => false,
         };
     }

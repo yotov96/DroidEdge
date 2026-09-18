@@ -18,6 +18,18 @@ public class EdgeGeometryTests
     }
 
     [Fact]
+    public void Cursor_reported_beyond_the_edge_still_counts_as_pushing()
+    {
+        // WH_MOUSE_LL reports the unclipped position: pushing past the left edge yields negative x.
+        var seg = new IntRect(0, 0, 1, 1080);
+        Assert.True(EdgeGeometry.IsPushingOut(Edge.Left, seg, -3, 500, -10, 0));
+        Assert.False(EdgeGeometry.IsPushingOut(Edge.Left, seg, -3, 1200, -10, 0)); // outside the segment span
+        Assert.True(EdgeGeometry.IsPushingOut(Edge.Right, new IntRect(1919, 0, 1920, 1080), 1925, 10, 4, 0));
+        Assert.True(EdgeGeometry.IsPushingOut(Edge.Top, new IntRect(0, 0, 1920, 1), 10, -7, 0, -2));
+        Assert.True(EdgeGeometry.IsPushingOut(Edge.Bottom, new IntRect(0, 1079, 1920, 1080), 10, 1085, 0, 3));
+    }
+
+    [Fact]
     public void Right_top_bottom_edges()
     {
         Assert.True(EdgeGeometry.IsPushingOut(Edge.Right, new IntRect(1919, 0, 1920, 1080), 1919, 10, 2, 0));
