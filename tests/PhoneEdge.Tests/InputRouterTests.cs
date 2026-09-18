@@ -229,4 +229,27 @@ public class InputRouterTests
         Assert.True(r.OnPhone);
         Assert.True(otherThreadGotIn);
     }
+
+    [Fact]
+    public void Racing_return_during_enter_delivers_both_mode_changes_in_order()
+    {
+        var (r, _, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        var seen = new List<bool>();
+        var returned = new ManualResetEventSlim();
+        r.ModeChanged += m =>
+        {
+            lock (seen) seen.Add(m);
+            if (m && !returned.IsSet)
+            {
+                // Simulate the session thread forcing a return while the enter notification is still running.
+                var t = new Thread(() => { r.ReturnToPc(); returned.Set(); });
+                t.Start();
+                Assert.True(t.Join(TimeSpan.FromSeconds(2)));
+            }
+        };
+        PushIn(r, k);
+        Assert.False(r.OnPhone);
+        lock (seen) Assert.Equal(new[] { true, false }, seen);
+    }
 }

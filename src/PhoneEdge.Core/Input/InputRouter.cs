@@ -25,7 +25,7 @@ public sealed class InputRouter
     private HidMouseButtons _buttons;
     private int _wheelAcc, _panAcc;
     private int _cursorX, _cursorY;
-    private bool? _pendingModeChange;
+    private readonly Queue<bool> _pendingModeChanges = new();
 
     public InputRouter(AppConfig cfg, IntRect monitor, IntRect edgeSegment, ICursor cursor, IInputGate gate, IReportSink sink, IClock clock, Action<string>? log = null)
     {
@@ -184,7 +184,7 @@ public sealed class InputRouter
         foreach (var (cx, cy) in MoveChunker.Resync(_phone.Width, _phone.Height, tx, ty))
             _sink.SendMouse(MouseReport.Encode(HidMouseButtons.None, cx, cy, 0, 0));
         _log($"Entered phone at ({tx},{ty}) from PC ({_cursorX},{_cursorY})");
-        _pendingModeChange = true;
+        _pendingModeChanges.Enqueue(true);
     }
 
     // Caller holds _lock. Idempotent.
@@ -210,18 +210,22 @@ public sealed class InputRouter
         _buttons = HidMouseButtons.None;
         _keyboard.ReleaseAll();
         _log("Returned to PC");
-        _pendingModeChange = false;
+        _pendingModeChanges.Enqueue(false);
     }
 
     // Called after the lock is released so subscribers can block or call back into the router safely.
+    // Drains every pending change in order so racing transitions are never lost or reordered.
     private void FlushModeChanged()
     {
-        bool? change;
-        lock (_lock)
+        while (true)
         {
-            change = _pendingModeChange;
-            _pendingModeChange = null;
+            bool change;
+            lock (_lock)
+            {
+                if (_pendingModeChanges.Count == 0) return;
+                change = _pendingModeChanges.Dequeue();
+            }
+            ModeChanged?.Invoke(change);
         }
-        if (change is bool c) ModeChanged?.Invoke(c);
     }
 }
