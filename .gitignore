@@ -1,0 +1,6 @@
+bin/
+obj/
+*.user
+.vs/
+phoneedge.log*
+phoneedge.json
