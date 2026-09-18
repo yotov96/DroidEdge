@@ -63,7 +63,7 @@ public sealed class TrayApp : ApplicationContext
             _raw.MouseMoved += (dx, dy) => _router.OnRawMouseMove(dx, dy);
             _raw.MouseButton += (b, down) => _router.OnRawMouseButton(b, down);
             _raw.Wheel += (delta, horizontal) => _router.OnRawWheel(delta, horizontal);
-            _raw.Key += (usage, down) => _router.OnRawKey(usage, down);
+            _hooks.Key += (usage, down) => _router.OnRawKey(usage, down);
             _hooks.CursorMoved += (x, y) => _router.OnCursorMoved(x, y);
             _hooks.PanicPressed += () => _router.ReturnToPc();
             _hooks.Start();

@@ -5,18 +5,20 @@ using Serilog;
 
 namespace PhoneEdge.Win;
 
-/// <summary>Message-only window that receives WM_INPUT for all mice and keyboards (RIDEV_INPUTSINK) and raises typed events.</summary>
+/// <summary>
+/// Message-only window that receives WM_INPUT for all mice (RIDEV_INPUTSINK) and raises typed events.
+/// Keyboards are deliberately not registered here: a key swallowed by the low-level keyboard hook never
+/// produces WM_INPUT, so keystrokes are taken from the hook itself (see LowLevelHooks.Key).
+/// </summary>
 public sealed class RawInputWindow : NativeWindow, IDisposable
 {
     private readonly ILogger _log;
-    private readonly HashSet<ushort> _unknownScancodesLogged = new();
     private readonly byte[] _buffer = new byte[256];
     private readonly GCHandle _pin;
 
     public event Action<int, int>? MouseMoved;
     public event Action<HidMouseButtons, bool>? MouseButton;
     public event Action<int, bool>? Wheel;
-    public event Action<byte, bool>? Key;
 
     public RawInputWindow(ILogger log)
     {
@@ -26,7 +28,6 @@ public sealed class RawInputWindow : NativeWindow, IDisposable
         var devices = new[]
         {
             new User32.RAWINPUTDEVICE { usUsagePage = 0x01, usUsage = 0x02, dwFlags = User32.RIDEV_INPUTSINK, hwndTarget = Handle }, // mouse
-            new User32.RAWINPUTDEVICE { usUsagePage = 0x01, usUsage = 0x06, dwFlags = User32.RIDEV_INPUTSINK, hwndTarget = Handle }, // keyboard
         };
         if (!User32.RegisterRawInputDevices(devices, (uint)devices.Length, (uint)Marshal.SizeOf<User32.RAWINPUTDEVICE>()))
             throw new InvalidOperationException($"RegisterRawInputDevices failed: {Marshal.GetLastWin32Error()}");
@@ -68,24 +69,6 @@ public sealed class RawInputWindow : NativeWindow, IDisposable
             if ((f & 0x0200) != 0) MouseButton?.Invoke(HidMouseButtons.Button5, false);
             if ((f & 0x0400) != 0) Wheel?.Invoke((short)mouse.usButtonData, false);
             if ((f & 0x0800) != 0) Wheel?.Invoke((short)mouse.usButtonData, true);
-        }
-        else if (header.dwType == User32.RIM_TYPEKEYBOARD)
-        {
-            var kb = Marshal.PtrToStructure<User32.RAWKEYBOARD>(data);
-            if (kb.MakeCode == 0 || kb.MakeCode == 0xFF || kb.VKey == 0xFF) return; // fake/overrun keys
-            bool down = (kb.Flags & User32.RI_KEY_BREAK) == 0;
-            byte usage;
-            if ((kb.Flags & User32.RI_KEY_E1) != 0 || kb.VKey == User32.VK_PAUSE)
-            {
-                usage = 0x48; // Pause
-            }
-            else if (!ScancodeMap.TryMap(kb.MakeCode, (kb.Flags & User32.RI_KEY_E0) != 0, out usage))
-            {
-                if (_unknownScancodesLogged.Add(kb.MakeCode))
-                    _log.Debug("Unmapped scancode 0x{Make:X2} e0={E0} vk=0x{Vk:X2}", kb.MakeCode, (kb.Flags & User32.RI_KEY_E0) != 0, kb.VKey);
-                return;
-            }
-            Key?.Invoke(usage, down);
         }
     }
 

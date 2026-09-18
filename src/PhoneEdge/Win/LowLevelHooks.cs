@@ -20,6 +20,8 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
     private readonly ManualResetEventSlim _started = new();
     private Exception? _startError;
     private long _slowWarnings;
+    private readonly HashSet<(uint scanCode, bool extended)> _unknownKeysLogged = new();
+    private const uint LlkhfExtended = 0x01; // KBDLLHOOKSTRUCT.flags: E0-prefixed scan code
 
     public LowLevelHooks(PanicHotkey panic, ILogger log)
     {
@@ -32,6 +34,8 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
     public bool Swallow { get => _swallow; set => _swallow = value; }
     public event Action<int, int>? CursorMoved;
     public event Action? PanicPressed;
+    /// <summary>A non-injected key press/release as a HID usage. Raised in every mode; the router ignores it while on the PC.</summary>
+    public event Action<byte, bool>? Key;
 
     public void Start()
     {
@@ -100,10 +104,22 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
         bool injected = (info.flags & User32.LLKHF_INJECTED) != 0;
         int msg = (int)wParam;
         bool down = msg is User32.WM_KEYDOWN or User32.WM_SYSKEYDOWN;
-        if (!injected && _panic.OnKey((int)info.vkCode, down))
+        if (!injected)
         {
-            _log.Information("Panic hotkey pressed");
-            PanicPressed?.Invoke();
+            if (_panic.OnKey((int)info.vkCode, down))
+            {
+                _log.Information("Panic hotkey pressed");
+                PanicPressed?.Invoke();
+            }
+            bool extended = (info.flags & LlkhfExtended) != 0;
+            if (KeyDecoder.TryDecode((ushort)info.scanCode, extended, info.vkCode, out var usage))
+            {
+                Key?.Invoke(usage, down);
+            }
+            else if (_unknownKeysLogged.Add((info.scanCode, extended)))
+            {
+                _log.Debug("Unmapped scancode 0x{Make:X2} extended={Ext} vk=0x{Vk:X2}", info.scanCode, extended, info.vkCode);
+            }
         }
         IntPtr result = !injected && _swallow ? 1 : User32.CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
         WarnIfSlow(t0, "keyboard");
