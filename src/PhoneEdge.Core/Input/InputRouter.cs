@@ -26,6 +26,7 @@ public sealed class InputRouter
     private int _wheelAcc, _panAcc;
     private int _cursorX, _cursorY;
     private readonly Queue<bool> _pendingModeChanges = new();
+    private bool _draining;
 
     public InputRouter(AppConfig cfg, IntRect monitor, IntRect edgeSegment, ICursor cursor, IInputGate gate, IReportSink sink, IClock clock, Action<string>? log = null)
     {
@@ -214,18 +215,35 @@ public sealed class InputRouter
     }
 
     // Called after the lock is released so subscribers can block or call back into the router safely.
-    // Drains every pending change in order so racing transitions are never lost or reordered.
+    // Exactly one thread drains at a time, so changes are delivered in the order they were queued.
     private void FlushModeChanged()
     {
-        while (true)
+        lock (_lock)
         {
-            bool change;
-            lock (_lock)
+            if (_draining) return; // the active drainer will deliver anything queued after this point
+            _draining = true;
+        }
+        try
+        {
+            while (true)
             {
-                if (_pendingModeChanges.Count == 0) return;
-                change = _pendingModeChanges.Dequeue();
+                bool change;
+                lock (_lock)
+                {
+                    if (_pendingModeChanges.Count == 0)
+                    {
+                        _draining = false; // released under the same lock as the emptiness check, so no item can be stranded
+                        return;
+                    }
+                    change = _pendingModeChanges.Dequeue();
+                }
+                ModeChanged?.Invoke(change);
             }
-            ModeChanged?.Invoke(change);
+        }
+        catch
+        {
+            lock (_lock) _draining = false;
+            throw;
         }
     }
 }

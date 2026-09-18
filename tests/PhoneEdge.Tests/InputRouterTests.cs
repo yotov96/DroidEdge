@@ -252,4 +252,31 @@ public class InputRouterTests
         Assert.False(r.OnPhone);
         lock (seen) Assert.Equal(new[] { true, false }, seen);
     }
+
+    [Fact]
+    public void Concurrent_flushes_deliver_mode_changes_in_queue_order()
+    {
+        var (r, _, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        var seen = new List<bool>();
+        var firstHandlerEntered = new ManualResetEventSlim();
+        var releaseFirstHandler = new ManualResetEventSlim();
+        r.ModeChanged += m =>
+        {
+            lock (seen) seen.Add(m);
+            if (m) { firstHandlerEntered.Set(); releaseFirstHandler.Wait(TimeSpan.FromSeconds(2)); }
+        };
+        var enter = new Thread(() => PushIn(r, k));
+        enter.Start();
+        Assert.True(firstHandlerEntered.Wait(TimeSpan.FromSeconds(2)));
+        // While thread A is inside ModeChanged(true), thread B returns to PC and flushes; it must not deliver false ahead of A.
+        var ret = new Thread(() => r.ReturnToPc());
+        ret.Start();
+        Assert.True(ret.Join(TimeSpan.FromSeconds(2)));
+        lock (seen) Assert.Equal(new[] { true }, seen); // false is queued, not yet delivered
+        releaseFirstHandler.Set();
+        Assert.True(enter.Join(TimeSpan.FromSeconds(2)));
+        lock (seen) Assert.Equal(new[] { true, false }, seen);
+        Assert.False(r.OnPhone);
+    }
 }
