@@ -15,6 +15,7 @@ public static class ConfigLoader
         public int? ExitDwellMs { get; set; }
         public double? Sensitivity { get; set; }
         public bool? ForwardKeyboard { get; set; }
+        public bool? RightClickIsBack { get; set; }
         public string[]? PanicHotkey { get; set; }
         public string? LogLevel { get; set; }
     }
@@ -85,6 +86,7 @@ public static class ConfigLoader
             ExitDwellMs = exit,
             Sensitivity = sens,
             ForwardKeyboard = dto.ForwardKeyboard ?? d.ForwardKeyboard,
+            RightClickIsBack = dto.RightClickIsBack ?? d.RightClickIsBack,
             PanicHotkey = hotkey,
             LogLevel = string.IsNullOrWhiteSpace(dto.LogLevel) ? d.LogLevel : dto.LogLevel,
         };

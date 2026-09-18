@@ -11,8 +11,10 @@ public class InputRouterTests
     {
         public List<byte[]> Mouse { get; } = new();
         public List<byte[]> Keyboard { get; } = new();
+        public List<bool> Back { get; } = new();
         public bool SendMouse(byte[] r) { Mouse.Add(r); return true; }
         public bool SendKeyboard(byte[] r) { Keyboard.Add(r); return true; }
+        public bool SendBack(bool down) { Back.Add(down); return true; }
     }
     private sealed class FakeCursor : ICursor
     {
@@ -146,6 +148,40 @@ public class InputRouterTests
         Assert.Equal(1, (sbyte)s.Mouse[^1][3]);
         r.OnRawWheel(-240, true);
         Assert.Equal(-2, (sbyte)s.Mouse[^1][4]);
+    }
+
+    [Fact]
+    public void Right_click_sends_back_instead_of_a_secondary_button()
+    {
+        var (r, s, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        PushIn(r, k);
+        s.Mouse.Clear();
+        r.OnRawMouseButton(HidMouseButtons.Right, true);
+        r.OnRawMouseButton(HidMouseButtons.Right, false);
+        Assert.Equal(new[] { true, false }, s.Back);
+        Assert.Empty(s.Mouse); // no HID button report at all
+    }
+
+    [Fact]
+    public void Right_click_is_a_secondary_button_when_the_option_is_off()
+    {
+        var (r, s, _, _, k) = Make(AppConfig.Default with { EnterDwellMs = 1000, RightClickIsBack = false });
+        r.SetPhoneReady(W, H);
+        PushIn(r, k);
+        s.Mouse.Clear();
+        r.OnRawMouseButton(HidMouseButtons.Right, true);
+        Assert.Empty(s.Back);
+        Assert.Equal((byte)HidMouseButtons.Right, s.Mouse[^1][0]);
+    }
+
+    [Fact]
+    public void Right_click_on_the_pc_is_ignored()
+    {
+        var (r, s, _, _, _) = Make();
+        r.SetPhoneReady(W, H);
+        r.OnRawMouseButton(HidMouseButtons.Right, true);
+        Assert.Empty(s.Back);
     }
 
     [Fact]

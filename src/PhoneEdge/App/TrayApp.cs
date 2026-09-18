@@ -162,6 +162,7 @@ public sealed class TrayApp : ApplicationContext
                   "exitDwellMs": 1000,
                   "sensitivity": 1.0,
                   "forwardKeyboard": true,
+                  "rightClickIsBack": true,
                   "panicHotkey": ["LControl", "RControl"],
                   "logLevel": "Info"
                 }

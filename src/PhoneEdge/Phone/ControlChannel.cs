@@ -38,6 +38,8 @@ public sealed class ControlChannel : IReportSink, IDisposable
 
     public bool SendMouse(byte[] report) => _queue.EnqueueMouse(report);
     public bool SendKeyboard(byte[] report) => _queue.EnqueueKeyboard(report);
+    // Called from the input path, so it must not stall: give up quickly if the queue is full.
+    public bool SendBack(bool down) => _queue.EnqueueRaw(ControlMessages.BackOrScreenOn(down), TimeSpan.FromMilliseconds(20));
     public void SendRaw(byte[] framed)
     {
         if (!_queue.EnqueueRaw(framed, RawEnqueueTimeout))

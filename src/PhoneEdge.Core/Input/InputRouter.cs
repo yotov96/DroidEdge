@@ -133,6 +133,12 @@ public sealed class InputRouter
         lock (_lock)
         {
             if (!OnPhone) return;
+            if (button == HidMouseButtons.Right && _cfg.RightClickIsBack)
+            {
+                // Android treats a secondary mouse button as a context click, not Back, so the server injects KEYCODE_BACK instead.
+                _sink.SendBack(down);
+                return;
+            }
             var next = down ? _buttons | button : _buttons & ~button;
             if (next == _buttons) return;
             _buttons = next;

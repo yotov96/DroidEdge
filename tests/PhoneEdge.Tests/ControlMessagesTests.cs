@@ -49,4 +49,12 @@ public class ControlMessagesTests
     {
         Assert.Equal(new byte[] { 14, 0x01, 0x02 }, ControlMessages.UhidDestroy(0x0102));
     }
+
+    [Fact]
+    public void BackOrScreenOn_matches_scrcpy_layout()
+    {
+        // type 4, then the Android key action: 0 = down, 1 = up
+        Assert.Equal(new byte[] { 4, 0 }, ControlMessages.BackOrScreenOn(down: true));
+        Assert.Equal(new byte[] { 4, 1 }, ControlMessages.BackOrScreenOn(down: false));
+    }
 }

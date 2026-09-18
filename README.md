@@ -9,11 +9,12 @@ Move your mouse past a monitor edge and it appears on your USB-connected Android
 ## Run
 - `.\publish.ps1` then start `dist\PhoneEdge.exe`; it lives in the tray.
 - Push the mouse against the **left edge of the primary monitor for 1 s** to cross. Push against the phone's right edge for 1 s to come back.
+- Right-click is Android **Back** (set `rightClickIsBack` to `false` to send it as a normal secondary button instead).
 - Panic: hold **Left Ctrl + Right Ctrl** to return instantly.
 - `PhoneEdge.exe --diag` runs an end-to-end check and shows a report.
 
 ## Config
-`phoneedge.json` next to the exe (tray → Open config creates it). Fields: `scrcpyDir`, `deviceSerial`, `edge` (left|right|top|bottom), `monitor` (primary|index), `enterDwellMs`, `exitDwellMs`, `sensitivity`, `forwardKeyboard`, `panicHotkey`, `logLevel`.
+`phoneedge.json` next to the exe (tray → Open config creates it). Fields: `scrcpyDir`, `deviceSerial`, `edge` (left|right|top|bottom), `monitor` (primary|index), `enterDwellMs`, `exitDwellMs`, `sensitivity`, `forwardKeyboard`, `rightClickIsBack`, `panicHotkey`, `logLevel`.
 
 ## Logs
 `phoneedge.log` next to the exe (tray → Open log).

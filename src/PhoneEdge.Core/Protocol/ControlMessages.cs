@@ -6,9 +6,13 @@ namespace PhoneEdge.Core.Protocol;
 /// <summary>Encoders for the scrcpy 4.1 client→server control messages we use.</summary>
 public static class ControlMessages
 {
+    public const byte TypeBackOrScreenOn = 4;
     public const byte TypeUhidCreate = 12;
     public const byte TypeUhidInput = 13;
     public const byte TypeUhidDestroy = 14;
+
+    /// <summary>Injects KEYCODE_BACK (or wakes the screen if it is off). Action byte: 0 = down, 1 = up.</summary>
+    public static byte[] BackOrScreenOn(bool down) => [TypeBackOrScreenOn, down ? (byte)0 : (byte)1];
 
     public static byte[] UhidCreate(ushort id, ushort vendorId, ushort productId, string name, ReadOnlySpan<byte> reportDesc)
     {

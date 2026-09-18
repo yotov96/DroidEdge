@@ -1,10 +1,12 @@
 namespace PhoneEdge.Core.Input;
 
-/// <summary>Receives HID reports (unframed) to deliver to the phone.</summary>
+/// <summary>Receives HID reports (unframed) and control actions to deliver to the phone.</summary>
 public interface IReportSink
 {
     bool SendMouse(byte[] report);
     bool SendKeyboard(byte[] report);
+    /// <summary>Android Back key press (true) or release (false), injected by the server rather than sent as HID.</summary>
+    bool SendBack(bool down);
 }
 
 public interface ICursor

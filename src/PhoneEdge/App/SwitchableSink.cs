@@ -9,4 +9,5 @@ public sealed class SwitchableSink : IReportSink
     public IReportSink? Target { get => _target; set => _target = value; }
     public bool SendMouse(byte[] report) => _target?.SendMouse(report) ?? false;
     public bool SendKeyboard(byte[] report) => _target?.SendKeyboard(report) ?? false;
+    public bool SendBack(bool down) => _target?.SendBack(down) ?? false;
 }
