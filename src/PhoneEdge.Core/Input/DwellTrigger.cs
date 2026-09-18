@@ -21,20 +21,16 @@ public sealed class DwellTrigger
             Reset();
             return false;
         }
-        if (_start < 0)
+        if (_start < 0 || nowMs - _last > _maxGapMs)
         {
             _start = nowMs;
         }
+        _last = nowMs;
         if (nowMs - _start >= _dwellMs)
         {
             Reset();
             return true;
         }
-        if (nowMs - _last > _maxGapMs)
-        {
-            _start = nowMs;
-        }
-        _last = nowMs;
         return false;
     }
 
