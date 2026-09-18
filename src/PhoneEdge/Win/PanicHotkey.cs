@@ -31,11 +31,13 @@ public sealed class PanicHotkey
         return new PanicHotkey(keys.Distinct().ToArray());
     }
 
-    /// <returns>true when this key event completes the combination.</returns>
+    /// <returns>true only on the key event that completes the combination (not on auto-repeat while it stays held).</returns>
     public bool OnKey(int vkCode, bool down)
     {
         if (!VirtualKeys.Contains(vkCode)) return false;
+        bool wasComplete = _down.Count == VirtualKeys.Count;
         if (down) _down.Add(vkCode); else _down.Remove(vkCode);
-        return down && _down.Count == VirtualKeys.Count;
+        bool nowComplete = _down.Count == VirtualKeys.Count;
+        return down && nowComplete && !wasComplete;
     }
 }
