@@ -8,11 +8,9 @@ public class DwellTriggerTests
     public void Fires_once_after_continuous_pushing()
     {
         var d = new DwellTrigger(1000);
-        Assert.False(d.Sample(true, 0));
-        Assert.False(d.Sample(true, 500));
-        Assert.False(d.Sample(true, 990));
+        for (int t = 0; t < 1000; t += 100) Assert.False(d.Sample(true, t)); // 0..900
         Assert.True(d.Sample(true, 1000));
-        Assert.False(d.Sample(true, 1010)); // reset after firing; new dwell starts
+        Assert.False(d.Sample(true, 1100)); // reset after firing; new dwell starts
     }
 
     [Fact]

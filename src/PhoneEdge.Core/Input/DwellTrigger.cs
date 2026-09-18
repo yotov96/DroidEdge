@@ -8,7 +8,7 @@ public sealed class DwellTrigger
     private long _start = -1;
     private long _last;
 
-    public DwellTrigger(int dwellMs, int maxGapMs = int.MaxValue)
+    public DwellTrigger(int dwellMs, int maxGapMs = 150)
     {
         _dwellMs = Math.Max(0, dwellMs);
         _maxGapMs = Math.Max(1, maxGapMs);
