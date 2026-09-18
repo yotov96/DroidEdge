@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PhoneEdge.Core.Hid;
 using PhoneEdge.Core.Input;
 using PhoneEdge.Core.Protocol;
@@ -58,14 +59,24 @@ public class ReportQueueTests
     public void Full_queue_evicts_oldest_coalescable_before_dropping()
     {
         var q = new ReportQueue(capacity: 3);
-        q.EnqueueMouse(Move(1, 0, HidMouseButtons.Left));   // coalescable A
-        q.EnqueueMouse(Move(1, 0, HidMouseButtons.Right));  // coalescable B
+        q.EnqueueMouse(Move(127, 0));                       // coalescable A
+        q.EnqueueMouse(Move(127, 0));                       // saturates tail A, remainder starts coalescable B
         q.EnqueueKeyboard(new byte[8]);                     // non-coalescable
         Assert.True(q.EnqueueKeyboard(new byte[8]));        // evicts A
         Assert.Equal(3, q.Count);
         Assert.True(q.EnqueueKeyboard(new byte[8]));        // evicts B
         Assert.False(q.EnqueueKeyboard(new byte[8]));       // nothing left to evict → dropped
         Assert.Equal(3, q.Count);
+    }
+
+    [Fact]
+    public void Button_transitions_are_never_evicted()
+    {
+        var q = new ReportQueue(capacity: 2);
+        q.EnqueueMouse(Move(0, 0, HidMouseButtons.Left)); // press
+        q.EnqueueMouse(Move(0, 0));                       // release
+        Assert.False(q.EnqueueKeyboard(new byte[8]));     // both are button transitions; nothing to evict → dropped
+        Assert.Equal(2, q.Count);
     }
 
     [Fact]
@@ -81,7 +92,18 @@ public class ReportQueueTests
     {
         var q = new ReportQueue();
         var raw = ControlMessages.UhidDestroy(1);
-        q.EnqueueRaw(raw);
+        Assert.True(q.EnqueueRaw(raw));
         Assert.Same(raw, q.Take(CancellationToken.None));
+    }
+
+    [Fact]
+    public void EnqueueRaw_gives_up_after_timeout()
+    {
+        var q = new ReportQueue(capacity: 1);
+        q.EnqueueKeyboard(new byte[8]); // fills the only slot with a non-coalescable item
+        var sw = Stopwatch.StartNew();
+        Assert.False(q.EnqueueRaw(ControlMessages.UhidDestroy(1), TimeSpan.FromMilliseconds(100)));
+        sw.Stop();
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2));
     }
 }

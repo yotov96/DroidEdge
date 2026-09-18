@@ -104,7 +104,13 @@ public sealed class PhoneSession : IDisposable
                     await Task.WhenAny(lost.Task, Task.Delay(RotationPoll, ct));
                     if (lost.Task.IsCompleted || ct.IsCancellationRequested) break;
                     DisplayInfo next;
-                    try { next = await settings.GetDisplayInfoAsync(ct); }
+                    try
+                    {
+                        var poll = settings.GetDisplayInfoAsync(ct);
+                        var finished = await Task.WhenAny(lost.Task, poll);
+                        if (finished == lost.Task) break;
+                        next = await poll;
+                    }
                     catch (OperationCanceledException) { break; }
                     catch (Exception ex) { _log.Warning(ex, "Display poll failed; treating as disconnect"); break; }
                     if (next != info)

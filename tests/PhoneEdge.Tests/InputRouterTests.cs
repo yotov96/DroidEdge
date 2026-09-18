@@ -214,6 +214,23 @@ public class InputRouterTests
     }
 
     [Fact]
+    public void UpdatePhoneBounds_while_on_phone_resyncs_real_cursor()
+    {
+        var (r, s, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        PushIn(r, k); // default y = 540, Edge.Left → phone entry x = W - 1
+        s.Mouse.Clear();
+        r.UpdatePhoneBounds(H, W); // rotated: new width = H, new height = W
+        int previousY = (int)Math.Round(540.0 / 1079 * (H - 1)); // same fraction math as EnterPhone
+        int expectedX = Math.Min(W - 1, H - 1); // entry x (W - 1) re-clamped to new width (H); W < H so unchanged
+        int expectedY = Math.Clamp(previousY, 0, W - 1); // previous y re-clamped to new height (W)
+        int sx = s.Mouse.Sum(m => (int)(sbyte)m[1]);
+        int sy = s.Mouse.Sum(m => (int)(sbyte)m[2]);
+        Assert.Equal(-(H + 127) + expectedX, sx);
+        Assert.Equal(-(W + 127) + expectedY, sy);
+    }
+
+    [Fact]
     public void ModeChanged_is_raised_outside_the_lock()
     {
         var (r, _, _, _, k) = Make();

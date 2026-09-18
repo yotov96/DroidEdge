@@ -12,6 +12,7 @@ public sealed class ControlChannel : IReportSink, IDisposable
     private readonly ILogger _log;
     private readonly ReportQueue _queue = new();
     private readonly CancellationTokenSource _cts = new();
+    private static readonly TimeSpan RawEnqueueTimeout = TimeSpan.FromMilliseconds(250);
     private Thread? _sender, _receiver;
     private int _lostSignalled;
     private bool _disposed;
@@ -37,7 +38,11 @@ public sealed class ControlChannel : IReportSink, IDisposable
 
     public bool SendMouse(byte[] report) => _queue.EnqueueMouse(report);
     public bool SendKeyboard(byte[] report) => _queue.EnqueueKeyboard(report);
-    public void SendRaw(byte[] framed) => _queue.EnqueueRaw(framed);
+    public void SendRaw(byte[] framed)
+    {
+        if (!_queue.EnqueueRaw(framed, RawEnqueueTimeout))
+            _log.Warning("Control message dropped: queue full for {Ms} ms", RawEnqueueTimeout.TotalMilliseconds);
+    }
 
     public void CreateDevices()
     {

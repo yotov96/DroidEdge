@@ -178,7 +178,12 @@ public sealed class TrayApp : ApplicationContext
     private void Ui(Action a)
     {
         if (_tray.UiControl.IsDisposed) return;
-        if (_tray.UiControl.InvokeRequired) _tray.UiControl.BeginInvoke(a); else a();
+        try
+        {
+            if (_tray.UiControl.InvokeRequired) _tray.UiControl.BeginInvoke(a); else a();
+        }
+        catch (ObjectDisposedException) { /* tray is being torn down */ }
+        catch (InvalidOperationException) { /* tray is being torn down */ }
     }
 
     /// <summary>Last-resort release used by the unhandled-exception handlers.</summary>

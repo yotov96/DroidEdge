@@ -76,6 +76,12 @@ public sealed class InputRouter
             if (_phone is null) return;
             _phone.SetBounds(width, height);
             _log($"Phone bounds updated: {width}x{height}");
+            if (OnPhone)
+            {
+                foreach (var (cx, cy) in MoveChunker.Resync(_phone.Width, _phone.Height, _phone.X, _phone.Y))
+                    _sink.SendMouse(MouseReport.Encode(_buttons, cx, cy, 0, 0));
+                _log($"Resynced phone cursor to ({_phone.X},{_phone.Y}) after bounds change");
+            }
         }
     }
 
@@ -237,7 +243,8 @@ public sealed class InputRouter
                     }
                     change = _pendingModeChanges.Dequeue();
                 }
-                ModeChanged?.Invoke(change);
+                try { ModeChanged?.Invoke(change); }
+                catch (Exception ex) { _log($"ModeChanged subscriber threw: {ex}"); }
             }
         }
         catch

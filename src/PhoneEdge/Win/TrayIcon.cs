@@ -10,6 +10,7 @@ public sealed class TrayIcon : IDisposable
     private readonly ToolStripMenuItem _status;
     private readonly ToolStripMenuItem _startup;
     private readonly Dictionary<TrayColor, Icon> _icons = new();
+    private bool _suppressStartupEvent;
 
     public TrayIcon(Action onReturnMouse, Action onDiagnostics, Action onOpenLog, Action onOpenConfig, Action<bool> onStartupToggle, Action onExit)
     {
@@ -20,7 +21,7 @@ public sealed class TrayIcon : IDisposable
 
         _status = new ToolStripMenuItem("Starting…") { Enabled = false };
         _startup = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true };
-        _startup.CheckedChanged += (_, _) => onStartupToggle(_startup.Checked);
+        _startup.CheckedChanged += (_, _) => { if (!_suppressStartupEvent) onStartupToggle(_startup.Checked); };
 
         var menu = new ContextMenuStrip();
         menu.Items.Add(_status);
@@ -47,7 +48,12 @@ public sealed class TrayIcon : IDisposable
 
     public void Balloon(string title, string text, ToolTipIcon icon) => _icon.ShowBalloonTip(3000, title, text, icon);
 
-    public void SetStartupChecked(bool checked_) => _startup.Checked = checked_;
+    public void SetStartupChecked(bool checked_)
+    {
+        _suppressStartupEvent = true;
+        _startup.Checked = checked_;
+        _suppressStartupEvent = false;
+    }
 
     private static Icon MakeIcon(TrayColor c)
     {

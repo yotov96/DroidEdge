@@ -17,6 +17,7 @@ public sealed class ReportQueue
     private readonly SemaphoreSlim _available = new(0);
     private readonly object _lock = new();
     private readonly int _capacity;
+    private byte _lastMouseButtons;
 
     public ReportQueue(int capacity = 256)
     {
@@ -26,8 +27,9 @@ public sealed class ReportQueue
 
     public int Count { get { lock (_lock) return _items.Count; } }
 
-    public void EnqueueRaw(byte[] framed)
+    public bool EnqueueRaw(byte[] framed, TimeSpan? timeout = null)
     {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromMilliseconds(250));
         while (true)
         {
             lock (_lock)
@@ -36,9 +38,10 @@ public sealed class ReportQueue
                 {
                     _items.AddLast(new Item { DeviceId = 0, Data = framed, Coalescable = false });
                     _available.Release();
-                    return;
+                    return true;
                 }
             }
+            if (DateTime.UtcNow >= deadline) return false;
             Thread.Sleep(1); // only reached from non-hook threads (create/destroy); wait for the sender to drain
         }
     }
@@ -46,9 +49,12 @@ public sealed class ReportQueue
     public bool EnqueueMouse(byte[] report)
     {
         if (report.Length != MouseReport.Size) throw new ArgumentException("mouse report must be 5 bytes", nameof(report));
-        bool coalescable = report[3] == 0 && report[4] == 0;
         lock (_lock)
         {
+            // A button transition is reported with zero deltas, same as a coalescable move; only treat it as
+            // coalescable when the buttons match the previously enqueued report, so a transition is never evicted.
+            bool coalescable = report[3] == 0 && report[4] == 0 && report[0] == _lastMouseButtons;
+            _lastMouseButtons = report[0];
             if (coalescable && _items.Last is { Value: { Coalescable: true, DeviceId: HidDescriptors.MouseId } tail } && tail.Data[0] == report[0])
             {
                 int sx = (sbyte)tail.Data[1] + (sbyte)report[1];

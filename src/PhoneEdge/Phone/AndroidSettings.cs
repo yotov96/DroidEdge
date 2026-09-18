@@ -20,6 +20,7 @@ public sealed class AndroidSettings
 
     public async Task ApplyPointerSettingsAsync(CancellationToken ct)
     {
+        if (_applied) return;
         _origSpeed = AdbParsers.ParseSettingValue((await _adb.ShellAsync(ct, "settings", "get", "system", SpeedKey)).StdOut);
         _origAccel = AdbParsers.ParseSettingValue((await _adb.ShellAsync(ct, "settings", "get", "system", AccelKey)).StdOut);
         _log.Information("Saved pointer settings: {Speed} / {Accel}", _origSpeed ?? "unset", _origAccel ?? "unset");
