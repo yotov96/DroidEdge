@@ -101,7 +101,8 @@ public static class ServerBootstrap
                 var one = new byte[1];
                 using (var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
                 {
-                    readCts.CancelAfter(1000);
+                    var remaining = deadline - DateTime.UtcNow;
+                    readCts.CancelAfter(remaining > TimeSpan.Zero ? remaining : TimeSpan.FromMilliseconds(1));
                     int n = await s.ReadAsync(one, readCts.Token);
                     if (n != 1) throw new IOException("server not ready (EOF before dummy byte)");
                 }

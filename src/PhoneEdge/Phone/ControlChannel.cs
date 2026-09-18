@@ -15,6 +15,7 @@ public sealed class ControlChannel : IReportSink, IDisposable
     private Thread? _sender, _receiver;
     private int _lostSignalled;
     private bool _disposed;
+    private volatile bool _sending;
 
     public ControlChannel(ServerConnection conn, ILogger log)
     {
@@ -58,12 +59,16 @@ public sealed class ControlChannel : IReportSink, IDisposable
             {
                 var msg = _queue.Take(_cts.Token);
                 if (msg is null) return;
-                _conn.Stream.Write(msg, 0, msg.Length);
+                _sending = true;
+                try { _conn.Stream.Write(msg, 0, msg.Length); }
+                finally { _sending = false; }
             }
         }
-        catch (Exception ex) when (!_cts.IsCancellationRequested)
+        catch (Exception ex)
         {
-            SignalLost(ex);
+            // Never let an exception escape a background thread; a failure during our own teardown is expected noise.
+            if (!_cts.IsCancellationRequested) SignalLost(ex);
+            else _log.Debug(ex, "Sender stopped during dispose");
         }
     }
 
@@ -78,16 +83,18 @@ public sealed class ControlChannel : IReportSink, IDisposable
                 _log.Debug("Device message: {Msg}", msg);
             }
         }
-        catch (Exception ex) when (!_cts.IsCancellationRequested)
+        catch (Exception ex)
         {
-            SignalLost(ex);
+            if (!_cts.IsCancellationRequested) SignalLost(ex);
+            else _log.Debug(ex, "Receiver stopped during dispose");
         }
     }
 
     private void SignalLost(Exception? ex)
     {
         if (Interlocked.Exchange(ref _lostSignalled, 1) != 0) return;
-        _log.Warning(ex, "Control channel lost");
+        if (_disposed) _log.Debug(ex, "Control channel lost (during dispose)");
+        else _log.Warning(ex, "Control channel lost");
         ConnectionLost?.Invoke(ex);
     }
 
@@ -97,7 +104,7 @@ public sealed class ControlChannel : IReportSink, IDisposable
         if (_disposed) return;
         _disposed = true;
         var until = DateTime.UtcNow + drain;
-        while (_queue.Count > 0 && DateTime.UtcNow < until && _lostSignalled == 0) Thread.Sleep(10);
+        while ((_queue.Count > 0 || _sending) && DateTime.UtcNow < until && _lostSignalled == 0) Thread.Sleep(10);
         _cts.Cancel();
         _conn.Dispose();
         _sender?.Join(1000);
