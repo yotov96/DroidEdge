@@ -33,8 +33,8 @@ public sealed class Adb
         using var p = new Process { StartInfo = BuildStartInfo(args) };
         _log.Debug("adb {Args}", string.Join(' ', args));
         p.Start();
-        var stdout = p.StandardOutput.ReadToEndAsync(ct);
-        var stderr = p.StandardError.ReadToEndAsync(ct);
+        var stdout = p.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        var stderr = p.StandardError.ReadToEndAsync(CancellationToken.None);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
         try
@@ -44,6 +44,8 @@ public sealed class Adb
         catch (OperationCanceledException)
         {
             try { p.Kill(entireProcessTree: true); } catch { /* already gone */ }
+            try { await Task.WhenAll(stdout, stderr).ConfigureAwait(false); } catch { /* pipes closed by the kill */ }
+            if (ct.IsCancellationRequested) throw;
             throw new TimeoutException($"adb {string.Join(' ', args)} timed out after {timeout.TotalSeconds:0}s");
         }
         var result = new AdbResult(p.ExitCode, await stdout.ConfigureAwait(false), await stderr.ConfigureAwait(false));
