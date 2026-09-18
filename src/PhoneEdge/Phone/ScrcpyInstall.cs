@@ -23,11 +23,17 @@ public static partial class ScrcpyInstall
     {
         try
         {
-            using var p = Process.Start(new ProcessStartInfo(exePath, "--version") { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true });
+            using var p = Process.Start(new ProcessStartInfo(exePath, "--version") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true });
             if (p is null) return null;
-            var first = p.StandardOutput.ReadLine();
-            p.WaitForExit(5000);
-            return first;
+            var output = p.StandardOutput.ReadToEndAsync();
+            _ = p.StandardError.ReadToEndAsync();
+            if (!p.WaitForExit(5000))
+            {
+                try { p.Kill(entireProcessTree: true); } catch { }
+                return null;
+            }
+            var text = output.Wait(1000) ? output.Result : null;
+            return text?.Split('\n').FirstOrDefault()?.TrimEnd('\r');
         }
         catch { return null; }
     }

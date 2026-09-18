@@ -56,7 +56,13 @@ public sealed class PhoneSession : IDisposable
     {
         State = s;
         _log.Information("Session: {State} - {Status}", s, status);
-        StateChanged?.Invoke(s, status);
+        Raise(() => StateChanged?.Invoke(s, status), nameof(StateChanged));
+    }
+
+    private void Raise(Action handler, string name)
+    {
+        try { handler(); }
+        catch (Exception ex) { _log.Error(ex, "{Handler} subscriber threw", name); }
     }
 
     private async Task LoopAsync(CancellationToken ct)
@@ -91,7 +97,7 @@ public sealed class PhoneSession : IDisposable
 
                 readyAt = DateTime.UtcNow;
                 SetState(SessionState.Ready, $"{conn.DeviceName} ({info.Width}x{info.Height})");
-                Connected?.Invoke(channel, info);
+                Raise(() => Connected?.Invoke(channel, info), nameof(Connected));
 
                 while (!ct.IsCancellationRequested && !lost.Task.IsCompleted)
                 {
@@ -105,7 +111,7 @@ public sealed class PhoneSession : IDisposable
                     {
                         info = next;
                         _log.Information("Display changed: {W}x{H} rotation {R}", info.Width, info.Height, info.Rotation);
-                        DisplayChanged?.Invoke(info);
+                        Raise(() => DisplayChanged?.Invoke(info), nameof(DisplayChanged));
                     }
                 }
             }
@@ -117,14 +123,17 @@ public sealed class PhoneSession : IDisposable
             finally
             {
                 SetState(SessionState.TearingDown, "Disconnecting");
-                try { Disconnected?.Invoke(); } catch (Exception ex) { _log.Error(ex, "Disconnected handler failed"); }
+                Raise(() => Disconnected?.Invoke(), nameof(Disconnected));
                 if (channel is not null)
                 {
                     if (channel.IsAlive) channel.DestroyDevices();
                     channel.Dispose(TimeSpan.FromSeconds(1));
                 }
-                try { await settings.RestoreAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5)); }
-                catch (Exception ex) { _log.Warning(ex, "Restore failed"); }
+                using (var restoreCts = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+                {
+                    try { await settings.RestoreAsync(restoreCts.Token); }
+                    catch (Exception ex) { _log.Warning(ex, "Restore failed or timed out"); }
+                }
             }
 
             if (ct.IsCancellationRequested) break;
@@ -161,7 +170,7 @@ public sealed class PhoneSession : IDisposable
 
     public void Dispose()
     {
+        // Cancel only; the loop may still be draining. StopAsync waits for it; the CTS is left to the GC.
         _cts.Cancel();
-        _cts.Dispose();
     }
 }
