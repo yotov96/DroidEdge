@@ -7,6 +7,8 @@ public interface IReportSink
     bool SendKeyboard(byte[] report);
     /// <summary>Android Back key press (true) or release (false), injected by the server rather than sent as HID.</summary>
     bool SendBack(bool down);
+    /// <summary>Android Power key press (true) or release (false); a press+release locks the phone.</summary>
+    bool SendPower(bool down);
 }
 
 public interface ICursor

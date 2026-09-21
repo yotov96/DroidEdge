@@ -130,20 +130,34 @@ public sealed class InputRouter
 
     public void OnRawMouseButton(HidMouseButtons button, bool down)
     {
-        lock (_lock)
+        lock (_lock) OnRawMouseButtonLocked(button, down);
+        FlushModeChanged(); // the middle-click "done" path can return to the PC
+    }
+
+    // Caller holds _lock.
+    private void OnRawMouseButtonLocked(HidMouseButtons button, bool down)
+    {
+        if (!OnPhone) return;
+        if (button == HidMouseButtons.Right && _cfg.RightClickIsBack)
         {
-            if (!OnPhone) return;
-            if (button == HidMouseButtons.Right && _cfg.RightClickIsBack)
-            {
-                // Android treats a secondary mouse button as a context click, not Back, so the server injects KEYCODE_BACK instead.
-                _sink.SendBack(down);
-                return;
-            }
-            var next = down ? _buttons | button : _buttons & ~button;
-            if (next == _buttons) return;
-            _buttons = next;
-            _sink.SendMouse(MouseReport.Encode(_buttons, 0, 0, 0, 0));
+            // Android treats a secondary mouse button as a context click, not Back, so the server injects KEYCODE_BACK instead.
+            _sink.SendBack(down);
+            return;
         }
+        if (button == HidMouseButtons.Middle && _cfg.MiddleClickIsDone)
+        {
+            // "I'm done": lock the phone (Power press/release) and hand the mouse back to the PC.
+            if (!down) return;
+            _sink.SendPower(true);
+            _sink.SendPower(false);
+            _log("Middle click: locking phone and returning to PC");
+            ReturnToPcCore(sendReleases: true);
+            return;
+        }
+        var next = down ? _buttons | button : _buttons & ~button;
+        if (next == _buttons) return;
+        _buttons = next;
+        _sink.SendMouse(MouseReport.Encode(_buttons, 0, 0, 0, 0));
     }
 
     public void OnRawWheel(int delta, bool horizontal)

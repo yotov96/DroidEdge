@@ -163,6 +163,7 @@ public sealed class TrayApp : ApplicationContext
                   "sensitivity": 1.0,
                   "forwardKeyboard": true,
                   "rightClickIsBack": true,
+                  "middleClickIsDone": true,
                   "panicHotkey": ["LControl", "RControl"],
                   "logLevel": "Info"
                 }

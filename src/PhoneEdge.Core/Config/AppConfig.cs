@@ -13,6 +13,8 @@ public sealed record AppConfig
     public bool ForwardKeyboard { get; init; } = true;
     /// <summary>Send right-click as Android Back instead of a secondary mouse button.</summary>
     public bool RightClickIsBack { get; init; } = true;
+    /// <summary>Middle-click while on the phone locks the phone (Power press) and returns the mouse to the PC.</summary>
+    public bool MiddleClickIsDone { get; init; } = true;
     public string[] PanicHotkey { get; init; } = ["LControl", "RControl"];
     public string LogLevel { get; init; } = "Info";
 
@@ -23,6 +25,7 @@ public sealed record AppConfig
         ScrcpyDir == other.ScrcpyDir && DeviceSerial == other.DeviceSerial && Edge == other.Edge &&
         Monitor == other.Monitor && EnterDwellMs == other.EnterDwellMs && ExitDwellMs == other.ExitDwellMs &&
         Sensitivity == other.Sensitivity && ForwardKeyboard == other.ForwardKeyboard && RightClickIsBack == other.RightClickIsBack &&
+        MiddleClickIsDone == other.MiddleClickIsDone &&
         PanicHotkey.SequenceEqual(other.PanicHotkey) && LogLevel == other.LogLevel;
 
     public override int GetHashCode() => HashCode.Combine(ScrcpyDir, Edge, Monitor, EnterDwellMs, ExitDwellMs, Sensitivity, ForwardKeyboard, LogLevel);

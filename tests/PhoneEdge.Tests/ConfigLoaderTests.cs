@@ -17,18 +17,20 @@ public class ConfigLoaderTests
         Assert.Equal(1.0, cfg.Sensitivity);
         Assert.True(cfg.ForwardKeyboard);
         Assert.True(cfg.RightClickIsBack);
+        Assert.True(cfg.MiddleClickIsDone);
         Assert.Equal(new[] { "LControl", "RControl" }, cfg.PanicHotkey);
     }
 
     [Fact]
     public void Partial_json_overrides_only_given_fields()
     {
-        var cfg = ConfigLoader.Parse("""{"edge":"right","enterDwellMs":250,"sensitivity":1.5,"rightClickIsBack":false}""", _ => { });
+        var cfg = ConfigLoader.Parse("""{"edge":"right","enterDwellMs":250,"sensitivity":1.5,"rightClickIsBack":false,"middleClickIsDone":false}""", _ => { });
         Assert.Equal(Edge.Right, cfg.Edge);
         Assert.Equal(250, cfg.EnterDwellMs);
         Assert.Equal(1.5, cfg.Sensitivity);
         Assert.Equal(1000, cfg.ExitDwellMs);
         Assert.False(cfg.RightClickIsBack);
+        Assert.False(cfg.MiddleClickIsDone);
     }
 
     [Fact]

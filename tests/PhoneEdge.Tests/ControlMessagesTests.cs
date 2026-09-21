@@ -51,6 +51,14 @@ public class ControlMessagesTests
     }
 
     [Fact]
+    public void InjectKeycode_matches_scrcpy_layout()
+    {
+        // type 0, action (0 down / 1 up), keycode, repeat, metaState as big-endian int32
+        Assert.Equal(new byte[] { 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0 }, ControlMessages.InjectKeycode(down: true, ControlMessages.KeycodePower));
+        Assert.Equal(new byte[] { 0, 1, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0 }, ControlMessages.InjectKeycode(down: false, ControlMessages.KeycodePower));
+    }
+
+    [Fact]
     public void BackOrScreenOn_matches_scrcpy_layout()
     {
         // type 4, then the Android key action: 0 = down, 1 = up

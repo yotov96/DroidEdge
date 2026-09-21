@@ -12,9 +12,11 @@ public class InputRouterTests
         public List<byte[]> Mouse { get; } = new();
         public List<byte[]> Keyboard { get; } = new();
         public List<bool> Back { get; } = new();
+        public List<bool> Power { get; } = new();
         public bool SendMouse(byte[] r) { Mouse.Add(r); return true; }
         public bool SendKeyboard(byte[] r) { Keyboard.Add(r); return true; }
         public bool SendBack(bool down) { Back.Add(down); return true; }
+        public bool SendPower(bool down) { Power.Add(down); return true; }
     }
     private sealed class FakeCursor : ICursor
     {
@@ -182,6 +184,38 @@ public class InputRouterTests
         r.SetPhoneReady(W, H);
         r.OnRawMouseButton(HidMouseButtons.Right, true);
         Assert.Empty(s.Back);
+    }
+
+    [Fact]
+    public void Middle_click_locks_the_phone_and_returns_to_pc()
+    {
+        var (r, s, c, g, k) = Make();
+        r.SetPhoneReady(W, H);
+        PushIn(r, k);
+        r.OnRawMouseButton(HidMouseButtons.Left, true); // a held button must be released by the return
+        s.Mouse.Clear();
+        r.OnRawMouseButton(HidMouseButtons.Middle, true);
+        Assert.Equal(new[] { true, false }, s.Power);
+        Assert.False(r.OnPhone);
+        Assert.False(g.Swallow);
+        Assert.Equal((1, 540), c.Pos);
+        Assert.Equal(0, s.Mouse[^1][0]); // release report, no middle-button report
+        Assert.DoesNotContain(s.Mouse, m => (m[0] & (byte)HidMouseButtons.Middle) != 0);
+        r.OnRawMouseButton(HidMouseButtons.Middle, false); // the release arrives on the PC and is ignored
+        Assert.Equal(2, s.Power.Count);
+    }
+
+    [Fact]
+    public void Middle_click_is_a_normal_button_when_the_option_is_off()
+    {
+        var (r, s, _, _, k) = Make(AppConfig.Default with { EnterDwellMs = 1000, MiddleClickIsDone = false });
+        r.SetPhoneReady(W, H);
+        PushIn(r, k);
+        s.Mouse.Clear();
+        r.OnRawMouseButton(HidMouseButtons.Middle, true);
+        Assert.Empty(s.Power);
+        Assert.True(r.OnPhone);
+        Assert.Equal((byte)HidMouseButtons.Middle, s.Mouse[^1][0]);
     }
 
     [Fact]
