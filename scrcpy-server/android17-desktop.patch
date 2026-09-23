@@ -1,0 +1,172 @@
+From 1ab17cca4dfdd02474059f3836b5c4df436616bd Mon Sep 17 00:00:00 2001
+From: Nikola Yotov <nikolayotov@protonmail.com>
+Date: Wed, 23 Sep 2026 14:34:38 +0300
+Subject: [PATCH 1/2] Use content mode switch for new displays on Android 17
+
+On Android 17, create the virtual display with
+VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH instead of OWN_CONTENT_ONLY
+and SHOULD_SHOW_SYSTEM_DECORATIONS (Android ignores the flag in combination
+with either). The display then gets system decorations in extended mode and
+is eligible for desktop windowing, so the taskbar can launch apps into desks.
+
+If the system drops the flag, recreate the display with the regular flags,
+because without OWN_CONTENT_ONLY it would mirror the main display.
+
+Only applies when system decorations are enabled (the default).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../scrcpy/video/NewDisplayCapture.java       | 31 +++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java b/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java
+index 5ed4c73..5ea9c8f 100644
+--- a/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java
+@@ -41,6 +41,12 @@ public class NewDisplayCapture extends SurfaceCapture {
+     private static final int VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED = 1 << 13;
+     private static final int VIRTUAL_DISPLAY_FLAG_OWN_FOCUS = 1 << 14;
+     private static final int VIRTUAL_DISPLAY_FLAG_DEVICE_DISPLAY_GROUP = 1 << 15;
++    private static final int VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH = 1 << 17;
++
++    // Internal field copied from android.view.Display
++    private static final int DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH = 1 << 15;
++
++    private static final int API_37_ANDROID_17 = 37;
+ 
+     private final VirtualDisplayListener vdListener;
+     private final NewDisplay newDisplay;
+@@ -231,8 +237,29 @@ public class NewDisplayCapture extends SurfaceCapture {
+                             | VIRTUAL_DISPLAY_FLAG_DEVICE_DISPLAY_GROUP;
+                 }
+             }
+-            VirtualDisplay vd = ServiceManager.getDisplayManager()
+-                    .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, flags);
++            VirtualDisplay vd = null;
++            if (vdSystemDecorations && Build.VERSION.SDK_INT >= API_37_ANDROID_17) {
++                // A display that can switch content mode gets system decorations in extended mode and is eligible for
++                // desktop windowing. Android ignores the flag when combined with OWN_CONTENT_ONLY or
++                // SHOULD_SHOW_SYSTEM_DECORATIONS.
++                int desktopFlags = (flags & ~(VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY | VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS))
++                        | VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
++                vd = ServiceManager.getDisplayManager()
++                        .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, desktopFlags);
++                if ((vd.getDisplay().getFlags() & DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH) != 0) {
++                    Ln.i("New display allows content mode switch (desktop windowing)");
++                } else {
++                    // Dropped by the system (feature disabled on this build): without OWN_CONTENT_ONLY the display would
++                    // mirror the main display, so recreate it with the regular flags
++                    Ln.w("Content mode switch not supported, using a regular virtual display");
++                    vd.release();
++                    vd = null;
++                }
++            }
++            if (vd == null) {
++                vd = ServiceManager.getDisplayManager()
++                        .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, flags);
++            }
+             setCurrentVirtualDisplay(vd); // used for client resize
+             int virtualDisplayId = vd.getDisplay().getDisplayId();
+             Ln.i("New display: " + displaySize.getWidth() + "x" + displaySize.getHeight() + "/" + dpi + " (id=" + virtualDisplayId + ")");
+-- 
+2.53.0.windows.2
+
+
+From 9819e6da98723ca1bbd7361635b9336304511d2f Mon Sep 17 00:00:00 2001
+From: Nikola Yotov <nikolayotov@protonmail.com>
+Date: Wed, 23 Sep 2026 15:26:24 +0300
+Subject: [PATCH 2/2] Give the Android 17 desktop display a fixed unique id
+
+A display that can switch content mode joins the display topology. The
+system stores the topology per set of display unique ids, but a virtual
+display gets a new id ("...,scrcpy,N") every time it is created, so the
+position the user chose in Settings was never restored.
+
+Create the display through VirtualDisplayConfig with a fixed unique id
+(hidden setUniqueId, requires ADD_TRUSTED_DISPLAY). Fall back to the
+previous way if that is not available.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../scrcpy/video/NewDisplayCapture.java       | 14 ++++++++++--
+ .../scrcpy/wrappers/DisplayManager.java       | 22 +++++++++++++++++--
+ 2 files changed, 32 insertions(+), 4 deletions(-)
+
+diff --git a/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java b/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java
+index 5ea9c8f..b96004d 100644
+--- a/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/NewDisplayCapture.java
+@@ -48,6 +48,8 @@ public class NewDisplayCapture extends SurfaceCapture {
+ 
+     private static final int API_37_ANDROID_17 = 37;
+ 
++    private static final String DESKTOP_DISPLAY_UNIQUE_ID = "scrcpy-desktop";
++
+     private final VirtualDisplayListener vdListener;
+     private final NewDisplay newDisplay;
+ 
+@@ -244,8 +246,16 @@ public class NewDisplayCapture extends SurfaceCapture {
+                 // SHOULD_SHOW_SYSTEM_DECORATIONS.
+                 int desktopFlags = (flags & ~(VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY | VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS))
+                         | VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+-                vd = ServiceManager.getDisplayManager()
+-                        .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, desktopFlags);
++                try {
++                    // The display joins the display topology; a fixed unique id lets the system remember where the user placed it
++                    vd = ServiceManager.getDisplayManager()
++                            .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, desktopFlags,
++                                    DESKTOP_DISPLAY_UNIQUE_ID);
++                } catch (ReflectiveOperationException | SecurityException e) {
++                    Ln.w("Could not create the display with a unique id", e);
++                    vd = ServiceManager.getDisplayManager()
++                            .createNewVirtualDisplay("scrcpy", displaySize.getWidth(), displaySize.getHeight(), dpi, surface, desktopFlags);
++                }
+                 if ((vd.getDisplay().getFlags() & DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH) != 0) {
+                     Ln.i("New display allows content mode switch (desktop windowing)");
+                 } else {
+diff --git a/server/src/main/java/com/genymobile/scrcpy/wrappers/DisplayManager.java b/server/src/main/java/com/genymobile/scrcpy/wrappers/DisplayManager.java
+index 1be04c3..9a1103d 100644
+--- a/server/src/main/java/com/genymobile/scrcpy/wrappers/DisplayManager.java
++++ b/server/src/main/java/com/genymobile/scrcpy/wrappers/DisplayManager.java
+@@ -11,6 +11,7 @@ import android.annotation.SuppressLint;
+ import android.annotation.TargetApi;
+ import android.content.Context;
+ import android.hardware.display.VirtualDisplay;
++import android.hardware.display.VirtualDisplayConfig;
+ import android.os.Handler;
+ import android.view.Display;
+ import android.view.Surface;
+@@ -174,11 +175,28 @@ public final class DisplayManager {
+     }
+ 
+     public VirtualDisplay createNewVirtualDisplay(String name, int width, int height, int dpi, Surface surface, int flags) throws Exception {
++        return newDisplayManager().createVirtualDisplay(name, width, height, dpi, surface, flags);
++    }
++
++    /**
++     * Create a virtual display with a fixed unique id, so that the system remembers its settings (such as its position in
++     * the display topology) across sessions. Without one, every new display gets a new id.
++     */
++    @TargetApi(AndroidVersions.API_34_ANDROID_14)
++    public VirtualDisplay createNewVirtualDisplay(String name, int width, int height, int dpi, Surface surface, int flags, String uniqueId)
++            throws Exception {
++        VirtualDisplayConfig.Builder builder = new VirtualDisplayConfig.Builder(name, width, height, dpi).setSurface(surface).setFlags(flags);
++        // Hidden API (Android 17), requires ADD_TRUSTED_DISPLAY
++        Method setUniqueId = VirtualDisplayConfig.Builder.class.getMethod("setUniqueId", String.class);
++        setUniqueId.invoke(builder, uniqueId);
++        return newDisplayManager().createVirtualDisplay(builder.build(), null, null);
++    }
++
++    private static android.hardware.display.DisplayManager newDisplayManager() throws Exception {
+         Constructor<android.hardware.display.DisplayManager> ctor = android.hardware.display.DisplayManager.class.getDeclaredConstructor(
+                 Context.class);
+         ctor.setAccessible(true);
+-        android.hardware.display.DisplayManager dm = ctor.newInstance(FakeContext.get());
+-        return dm.createVirtualDisplay(name, width, height, dpi, surface, flags);
++        return ctor.newInstance(FakeContext.get());
+     }
+ 
+     private Method getRequestDisplayPowerMethod() throws NoSuchMethodException {
+-- 
+2.53.0.windows.2
+

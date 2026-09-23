@@ -13,6 +13,10 @@ public sealed class PhoneDesktop : IDisposable
 {
     public const string WindowTitle = "Phone desktop";
 
+    // scrcpy's server with the Android 17 desktop patch, built by scrcpy-server\build.ps1. Without it scrcpy uses its own
+    // server, whose virtual display cannot host desktop windows.
+    private static readonly string DesktopServerPath = Path.Combine(AppContext.BaseDirectory, "scrcpy-server-desktop");
+
     private readonly string _scrcpyExe;
     private readonly ILogger _log;
     private Process? _process;
@@ -58,6 +62,8 @@ public sealed class PhoneDesktop : IDisposable
             RedirectStandardError = true,
         };
         foreach (var a in BuildArguments(serial, cfg)) psi.ArgumentList.Add(a);
+        bool patchedServer = File.Exists(DesktopServerPath);
+        if (patchedServer) psi.Environment["SCRCPY_SERVER_PATH"] = DesktopServerPath;
 
         var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
         p.OutputDataReceived += (_, e) => { if (e.Data is not null) _log.Information("[desktop] {Line}", e.Data); };
@@ -71,7 +77,8 @@ public sealed class PhoneDesktop : IDisposable
         p.BeginOutputReadLine();
         p.BeginErrorReadLine();
         _process = p;
-        _log.Information("Phone desktop opened: scrcpy {Args}", string.Join(' ', psi.ArgumentList));
+        _log.Information("Phone desktop opened: scrcpy {Args} ({Server})", string.Join(' ', psi.ArgumentList),
+            patchedServer ? $"server {DesktopServerPath}" : "stock server");
     }
 
     private void BringToFront()

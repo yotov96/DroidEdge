@@ -34,7 +34,23 @@ While the desktop window is open the phone is kept awake (scrcpy `--stay-awake`,
 - `desktopDisplay`: initial size and density in scrcpy's syntax, e.g. `"1920x1080"`, `"1440x1800/240"`, `"/240"` (phone size, 240 dpi) or `""` (phone size and density). Higher dpi means bigger UI.
 - `desktopFlex` (default `true`): the virtual display keeps resizing to match the window, so it fits whatever size your window manager gives it.
 - Both are re-read each time the window opens; close it and reopen from the tray to apply changes.
-- For resizable app windows on the virtual display, enable the phone's developer option **Force desktop mode** and reboot the phone.
+
+### Desktop windows (Android 17)
+With stock scrcpy, clicking the taskbar or app list on the virtual display opens nothing: Android only lets a secondary display host desktop windows if the display can switch between mirroring and extending, and scrcpy's virtual display can't. `scrcpy-server/android17-desktop.patch` makes scrcpy's server create one that can, on Android 17 and later. Apps then open as desktop windows (move, resize, minimize, maximize, close) on the virtual display.
+
+- Build the patched server into `dist\scrcpy-server-desktop` (below). PhoneEdge uses it for the desktop window whenever the file is there; the log says which server was used. On Android 16 and older, or if Android rejects the new flag, it behaves like stock scrcpy.
+- One-time phone setup:
+  - Keep the phone screen in the display arrangement: `adb shell settings put secure include_default_display_in_topology 1`. Without it Android drops the phone screen from the arrangement while the desktop is open, and the phone cursor lands on the desktop instead.
+  - Open the desktop, then in Settings → Connected devices → External display drag it **below** the phone. Android first places it above the phone, where the cursor would slide onto it when PhoneEdge positions it; the position is remembered afterwards.
+
+### Building the desktop server
+Needs JDK 17 (e.g. Temurin, unzipped to `C:\tools\jdk-17…`) and the Android SDK packages `platforms;android-36` and `build-tools;36.0.0` in `C:\tools\android-sdk` (`build.ps1` takes `-ScrcpySource`, `-Jdk` and `-Sdk` for other locations).
+```powershell
+git clone --branch v4.1 https://github.com/Genymobile/scrcpy.git C:\tools\scrcpy
+git -C C:\tools\scrcpy am C:\tools\PhoneEdge\scrcpy-server\android17-desktop.patch
+.\scrcpy-server\build.ps1
+```
+The server must match scrcpy.exe's version, which refuses a server built for another one. After updating scrcpy, apply the patch to the new version and rebuild, or delete `dist\scrcpy-server-desktop` to fall back to the stock server.
 
 ## Config
 `phoneedge.json` next to the exe (tray → Open config creates it). Fields: `scrcpyDir`, `deviceSerial`, `edge` (left|right|top|bottom), `monitor` (primary|index), `enterDwellMs`, `exitDwellMs`, `sensitivity`, `forwardKeyboard`, `rightClickIsBack`, `middleClickIsDone`, `syncClipboard`, `openDesktopOnConnect`, `desktopDisplay`, `desktopFlex`, `panicHotkey`, `logLevel`.
