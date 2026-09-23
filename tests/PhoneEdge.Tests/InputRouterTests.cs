@@ -65,7 +65,7 @@ public class InputRouterTests
     {
         // Real WH_MOUSE_LL positions while pushing against the left edge are negative (unclipped).
         var (r, _, c, g, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         for (int t = 0; t <= 1100 && !r.OnPhone; t += 50)
         {
             r.OnCursorMoved(-(1 + t / 50), 540);
@@ -82,7 +82,7 @@ public class InputRouterTests
     {
         var (r, s, c, g, k) = Make();
         bool? mode = null; r.ModeChanged += m => mode = m;
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k, y: 540);
         Assert.True(r.OnPhone);
         Assert.True(g.Swallow);
@@ -100,7 +100,7 @@ public class InputRouterTests
     public void Pushing_with_gap_does_not_enter()
     {
         var (r, _, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         r.OnCursorMoved(0, 540);
         k.NowMs = 0; r.OnRawMouseMove(-1, 0);
         k.NowMs = 600; r.OnRawMouseMove(-1, 0);   // gap > 150 → restart
@@ -112,7 +112,7 @@ public class InputRouterTests
     public void On_phone_moves_are_forwarded_and_clamped()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         s.Mouse.Clear();
         r.OnRawMouseMove(-10, 3);
@@ -134,7 +134,7 @@ public class InputRouterTests
     public void Buttons_and_wheel_are_forwarded()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         s.Mouse.Clear();
         r.OnRawMouseButton(HidMouseButtons.Left, true);
@@ -156,7 +156,7 @@ public class InputRouterTests
     public void Does_not_cross_while_a_mouse_button_is_held_and_raises_drag_at_edge_instead()
     {
         var (r, _, _, g, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         var drags = new List<(int x, int y)>();
         r.DragAtEdge += (x, y) => drags.Add((x, y));
         r.OnRawMouseButton(HidMouseButtons.Left, true); // pressed on the PC, e.g. dragging a file
@@ -171,7 +171,7 @@ public class InputRouterTests
     public void Crossing_works_again_after_the_button_is_released()
     {
         var (r, _, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         r.OnRawMouseButton(HidMouseButtons.Left, true);
         r.OnCursorMoved(0, 540);
         for (int t = 0; t <= 1500; t += 50) { k.NowMs = t; r.OnRawMouseMove(-2, 0); }
@@ -197,7 +197,7 @@ public class InputRouterTests
     public void Right_click_sends_back_instead_of_a_secondary_button()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         s.Mouse.Clear();
         r.OnRawMouseButton(HidMouseButtons.Right, true);
@@ -210,7 +210,7 @@ public class InputRouterTests
     public void Right_click_is_a_secondary_button_when_the_option_is_off()
     {
         var (r, s, _, _, k) = Make(AppConfig.Default with { EnterDwellMs = 1000, RightClickIsBack = false });
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         s.Mouse.Clear();
         r.OnRawMouseButton(HidMouseButtons.Right, true);
@@ -222,7 +222,7 @@ public class InputRouterTests
     public void Right_click_on_the_pc_is_ignored()
     {
         var (r, s, _, _, _) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         r.OnRawMouseButton(HidMouseButtons.Right, true);
         Assert.Empty(s.Back);
     }
@@ -242,7 +242,7 @@ public class InputRouterTests
     public void Middle_click_turns_the_phone_screen_off_and_returns_to_pc()
     {
         var (r, s, c, g, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         r.OnRawMouseButton(HidMouseButtons.Left, true); // a held button must be released by the return
         s.Mouse.Clear();
@@ -261,7 +261,7 @@ public class InputRouterTests
     public void Crossing_after_middle_click_turns_the_screen_back_on()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         r.OnRawMouseButton(HidMouseButtons.Middle, true);
         r.OnRawMouseButton(HidMouseButtons.Middle, false);
@@ -274,7 +274,7 @@ public class InputRouterTests
     public void Middle_click_is_a_normal_button_when_the_option_is_off()
     {
         var (r, s, _, _, k) = Make(AppConfig.Default with { EnterDwellMs = 1000, MiddleClickIsDone = false });
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         s.Mouse.Clear();
         r.OnRawMouseButton(HidMouseButtons.Middle, true);
@@ -287,7 +287,7 @@ public class InputRouterTests
     public void With_the_desktop_open_the_screen_is_off_on_the_pc_and_on_while_on_the_phone()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         r.SetDesktopOpen(true);
         Assert.Equal(new[] { false }, s.DisplayPower);
         PushIn(r, k);
@@ -301,7 +301,7 @@ public class InputRouterTests
     public void Without_the_desktop_crossing_leaves_the_screen_alone()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         PushOut(r, k);
         r.ReturnToPc();
@@ -313,7 +313,7 @@ public class InputRouterTests
     public void Opening_the_desktop_while_on_the_phone_waits_until_the_mouse_leaves()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         r.SetDesktopOpen(true);
         Assert.Empty(s.DisplayPower);
@@ -326,10 +326,10 @@ public class InputRouterTests
     {
         // The old server's cleanup turns the screen back on when the connection drops.
         var (r, s, _, _, _) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         r.SetDesktopOpen(true);
         r.SetPhoneUnavailable();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         Assert.Equal(new[] { false, false }, s.DisplayPower);
     }
 
@@ -337,7 +337,7 @@ public class InputRouterTests
     public void After_the_desktop_closes_leaving_the_phone_no_longer_turns_the_screen_off()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         r.SetDesktopOpen(true);
         r.SetDesktopOpen(false);
         PushIn(r, k);
@@ -350,7 +350,7 @@ public class InputRouterTests
     public void Returns_after_pushing_back_at_entry_edge()
     {
         var (r, s, c, g, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k, y: 270); // 25% down
         r.OnRawMouseButton(HidMouseButtons.Left, true);
         r.OnRawKey(0x04, true);
@@ -371,7 +371,7 @@ public class InputRouterTests
         var (r, s, _, g, k) = Make();
         r.ReturnToPc();
         Assert.False(g.Swallow);
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         r.ReturnToPc();
         Assert.False(r.OnPhone);
@@ -384,7 +384,7 @@ public class InputRouterTests
     public void Phone_unavailable_while_on_phone_returns_to_pc_without_sending()
     {
         var (r, s, _, g, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
         int n = s.Mouse.Count;
         r.SetPhoneUnavailable();
@@ -398,7 +398,7 @@ public class InputRouterTests
     public void Keys_forwarded_only_on_phone_and_when_enabled()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         r.OnRawKey(0x04, true);
         Assert.Empty(s.Keyboard);
         PushIn(r, k);
@@ -410,7 +410,7 @@ public class InputRouterTests
         Assert.Equal(0, s.Keyboard[^1][2]);
 
         var (r2, s2, _, _, k2) = Make(AppConfig.Default with { ForwardKeyboard = false, EnterDwellMs = 1000 });
-        r2.SetPhoneReady(W, H);
+        r2.SetPhoneReady(W, H, 1.0);
         PushIn(r2, k2);
         r2.OnRawKey(0x04, true);
         Assert.Empty(s2.Keyboard);
@@ -420,9 +420,9 @@ public class InputRouterTests
     public void UpdatePhoneBounds_reclamps_position()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k, y: 1079); // bottom → phone y = H-1
-        r.UpdatePhoneBounds(H, W); // rotated
+        r.UpdatePhoneBounds(H, W, 1.0); // rotated
         s.Mouse.Clear();
         r.OnRawMouseMove(0, 1); // now at bottom (W-1) of the rotated display: nothing applied
         Assert.Empty(s.Mouse);
@@ -432,10 +432,10 @@ public class InputRouterTests
     public void UpdatePhoneBounds_while_on_phone_resyncs_real_cursor()
     {
         var (r, s, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k); // default y = 540, Edge.Left → phone entry x = W - 1
         s.Mouse.Clear();
-        r.UpdatePhoneBounds(H, W); // rotated: new width = H, new height = W
+        r.UpdatePhoneBounds(H, W, 1.0); // rotated: new width = H, new height = W
         int previousY = (int)Math.Round(540.0 / 1079 * (H - 1)); // same fraction math as EnterPhone
         int expectedX = Math.Min(W - 1, H - 1); // entry x (W - 1) re-clamped to new width (H); W < H so unchanged
         int expectedY = Math.Clamp(previousY, 0, W - 1); // previous y re-clamped to new height (W)
@@ -449,7 +449,7 @@ public class InputRouterTests
     public void ModeChanged_is_raised_outside_the_lock()
     {
         var (r, _, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         bool otherThreadGotIn = false;
         r.ModeChanged += _ =>
         {
@@ -466,7 +466,7 @@ public class InputRouterTests
     public void Racing_return_during_enter_delivers_both_mode_changes_in_order()
     {
         var (r, _, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         var seen = new List<bool>();
         var returned = new ManualResetEventSlim();
         r.ModeChanged += m =>
@@ -489,7 +489,7 @@ public class InputRouterTests
     public void Concurrent_flushes_deliver_mode_changes_in_queue_order()
     {
         var (r, _, _, _, k) = Make();
-        r.SetPhoneReady(W, H);
+        r.SetPhoneReady(W, H, 1.0);
         var seen = new List<bool>();
         var firstHandlerEntered = new ManualResetEventSlim();
         var releaseFirstHandler = new ManualResetEventSlim();

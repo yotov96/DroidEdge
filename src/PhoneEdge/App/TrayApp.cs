@@ -178,7 +178,7 @@ public sealed class TrayApp : ApplicationContext
         {
             _phone = phone;
             _sink.Target = phone.Channel;
-            _router.SetPhoneReady(info.Width, info.Height);
+            _router.SetPhoneReady(info.Width, info.Height, PointerTracker.PixelsPerCountFor(phone.SdkVersion, info.DensityDpi));
             if (_cfg.SyncClipboard) phone.Channel.ClipboardChanged += text => Ui(() => _clipboard.OnPhoneClipboard(text));
             Ui(() =>
             {
@@ -186,7 +186,11 @@ public sealed class TrayApp : ApplicationContext
                 if (fresh.OpenDesktopOnConnect) OpenDesktop(phone, fresh, bringToFront: false);
             });
         };
-        s.DisplayChanged += info => _router.UpdatePhoneBounds(info.Width, info.Height);
+        s.DisplayChanged += info =>
+        {
+            if (_phone is { } phone)
+                _router.UpdatePhoneBounds(info.Width, info.Height, PointerTracker.PixelsPerCountFor(phone.SdkVersion, info.DensityDpi));
+        };
         s.Disconnected += () => { _router.SetPhoneUnavailable(); _sink.Target = null; _phone = null; };
         _session = s;
         s.Start();

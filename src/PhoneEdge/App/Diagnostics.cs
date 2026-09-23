@@ -38,7 +38,9 @@ public static class Diagnostics
         try
         {
             var info = await settings.GetDisplayInfoAsync(ct);
-            Step("display info", true, $"{info.Width}x{info.Height} rotation {info.Rotation}");
+            int sdk = await settings.GetSdkVersionAsync(ct);
+            double pixelsPerCount = PointerTracker.PixelsPerCountFor(sdk, info.DensityDpi);
+            Step("display info", true, $"{info.Width}x{info.Height} rotation {info.Rotation}, {info.DensityDpi} dpi, API {sdk}, {pixelsPerCount:0.###} px per count");
 
             var conn = await ServerBootstrap.StartAsync(adb, jar, clipboardAutosync: false, log, ct);
             Step("server bootstrap", true, $"device '{conn.DeviceName}' port {conn.LocalPort}");
@@ -51,10 +53,12 @@ public static class Diagnostics
             await settings.ApplyPointerSettingsAsync(ct);
             Step("pointer acceleration disabled", true);
 
+            var tracker = new PointerTracker(info.Width, info.Height, 1.0, pixelsPerCount);
             (int x, int y)[] corners = [(0, 0), (info.Width - 1, 0), (info.Width - 1, info.Height - 1), (0, info.Height - 1), (info.Width / 2, info.Height / 2)];
             foreach (var (x, y) in corners)
             {
-                foreach (var (dx, dy) in MoveChunker.Resync(info.Width, info.Height, x, y))
+                tracker.SetPosition(x, y);
+                foreach (var (dx, dy) in tracker.Resync())
                     channel.SendMouse(MouseReport.Encode(HidMouseButtons.None, dx, dy, 0, 0));
                 await Task.Delay(500, ct);
             }

@@ -61,6 +61,13 @@ public sealed class AndroidSettings
         var size = AdbParsers.ParseWmSize(wm.StdOut);
         if (size is null) throw new InvalidOperationException("Could not determine display size from 'dumpsys input' or 'wm size'");
         _log.Warning("Viewport not found in dumpsys input; assuming rotation 0 with size {W}x{H}", size.Value.w, size.Value.h);
-        return new DisplayInfo(size.Value.w, size.Value.h, 0);
+        return new DisplayInfo(size.Value.w, size.Value.h, 0, 0);
+    }
+
+    /// <returns>The Android API level, or 0 if it cannot be read.</returns>
+    public async Task<int> GetSdkVersionAsync(CancellationToken ct)
+    {
+        var r = await _adb.ShellAsync(ct, "getprop", "ro.build.version.sdk");
+        return int.TryParse(r.StdOut.Trim(), out var sdk) ? sdk : 0;
     }
 }

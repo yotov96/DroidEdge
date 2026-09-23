@@ -36,8 +36,56 @@ public class PointerTrackerTests
     {
         var t = new PointerTracker(1000, 2000, 1.0);
         t.SetPosition(900, 1900);
-        t.SetBounds(2000, 1000);
+        t.SetBounds(2000, 1000, 1.0);
         Assert.Equal((900, 999), (t.X, t.Y));
+    }
+
+    [Fact]
+    public void PixelsPerCountFor_scales_by_density_from_Android_17()
+    {
+        Assert.Equal(1.125, PointerTracker.PixelsPerCountFor(37, 360));
+        Assert.Equal(0.5, PointerTracker.PixelsPerCountFor(38, 160));
+        Assert.Equal(1.0, PointerTracker.PixelsPerCountFor(36, 360));
+        Assert.Equal(1.0, PointerTracker.PixelsPerCountFor(37, 0)); // density unknown
+    }
+
+    [Fact]
+    public void Scaled_counts_keep_the_real_cursor_at_or_inside_the_tracked_position()
+    {
+        var t = new PointerTracker(1008, 2244, 1.0, 1.125);
+        t.SetPosition(0, 0);
+        int sumX = 0, sumY = 0;
+        for (int i = 0; i < 100; i++)
+        {
+            var (cx, cy) = t.Move(37, 53);
+            sumX += cx;
+            sumY += cy;
+            Assert.InRange(sumX * 1.125, t.X - 1.125, t.X);
+            Assert.InRange(sumY * 1.125, t.Y - 1.125, t.Y);
+        }
+        Assert.True(t.AtRight && t.AtBottom);
+        Assert.Equal((0, 0), t.Move(50, 50)); // pinned at the edge: the real cursor gets no further
+    }
+
+    [Fact]
+    public void Resync_overshoot_reaches_the_corner_at_any_scale()
+    {
+        var t = new PointerTracker(1000, 2000, 1.0, 0.5); // each count moves the cursor half a pixel
+        t.SetPosition(10, 20);
+        var moves = t.Resync().ToArray();
+        var push = moves.TakeWhile(m => m.dx < 0 || m.dy < 0).ToArray();
+        Assert.True(push.Sum(m => m.dx) * 0.5 <= -1000);
+        Assert.True(push.Sum(m => m.dy) * 0.5 <= -2000);
+        Assert.Equal(-(2000 + 127) + 20, moves.Sum(m => m.dx));
+        Assert.Equal(-(4000 + 127) + 40, moves.Sum(m => m.dy));
+    }
+
+    [Fact]
+    public void Resync_at_scale_1_matches_the_unscaled_moves()
+    {
+        var t = new PointerTracker(1344, 2992, 1.0);
+        t.SetPosition(1343, 900);
+        Assert.Equal(MoveChunker.Resync(1344, 2992, 1343, 900), t.Resync());
     }
 
     [Fact]

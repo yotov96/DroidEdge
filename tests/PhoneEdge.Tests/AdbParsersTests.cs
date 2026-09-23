@@ -38,7 +38,18 @@ public class AdbParsersTests
             """;
         var v = AdbParsers.ParseViewport(s);
         Assert.NotNull(v);
-        Assert.Equal((2992, 1344, 1), (v!.Width, v.Height, v.Rotation));
+        Assert.Equal((2992, 1344, 1, 0), (v!.Width, v.Height, v.Rotation, v.DensityDpi));
+    }
+
+    [Fact]
+    public void ParseViewport_reads_density_of_display_0()
+    {
+        // Android 17 format, taken from a Pixel 8 Pro
+        const string s = """
+                Viewport INTERNAL: displayId=0, uniqueId=local:4619827535830457088, port=0, orientation=0, densityDpi=360 xDpi=365.760010, yDpi=367.726013, logicalFrame=[0, 0, 1008, 2244], physicalFrame=[0, 0, 1008, 2244], deviceSize=[1008, 2244], isActive=[1]
+                Viewport VIRTUAL: displayId=3, uniqueId=virtual:com.android.shell,2000,scrcpy,1, port=<none>, orientation=0, densityDpi=160 xDpi=160.000000, yDpi=160.000000, logicalFrame=[0, 0, 1918, 1000], physicalFrame=[0, 0, 1918, 1000], deviceSize=[1918, 1000], isActive=[1]
+            """;
+        Assert.Equal(new DisplayInfo(1008, 2244, 0, 360), AdbParsers.ParseViewport(s));
     }
 
     [Fact]

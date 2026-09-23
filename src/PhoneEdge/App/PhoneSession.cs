@@ -94,10 +94,11 @@ public sealed class PhoneSession : IDisposable
                 channel.CreateDevices();
                 await settings.ApplyPointerSettingsAsync(ct);
                 var info = await settings.GetDisplayInfoAsync(ct);
+                int sdk = await settings.GetSdkVersionAsync(ct);
 
                 readyAt = DateTime.UtcNow;
                 SetState(SessionState.Ready, $"{conn.DeviceName} ({info.Width}x{info.Height})");
-                var phone = new PhoneConnection(adb, channel);
+                var phone = new PhoneConnection(adb, channel, sdk);
                 Raise(() => Connected?.Invoke(phone, info), nameof(Connected));
 
                 while (!ct.IsCancellationRequested && !lost.Task.IsCompleted)

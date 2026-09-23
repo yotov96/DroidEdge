@@ -17,7 +17,10 @@ public static class MoveChunker
         }
     }
 
-    /// <summary>Moves that first pin the real cursor at the top-left corner (overshooting the display size) and then travel to the target.</summary>
+    /// <summary>
+    /// Moves that first pin the real cursor at the top-left corner (overshooting the display size) and then travel to the target.
+    /// Size and target are in HID counts.
+    /// </summary>
     public static IEnumerable<(sbyte dx, sbyte dy)> Resync(int width, int height, int targetX, int targetY)
     {
         foreach (var m in Chunk(-(width + Max), -(height + Max))) yield return m;

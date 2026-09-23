@@ -4,8 +4,8 @@ namespace PhoneEdge.Phone;
 
 public sealed record AdbDevice(string Serial, string State);
 
-/// <summary>Current oriented logical display size and rotation (0..3).</summary>
-public sealed record DisplayInfo(int Width, int Height, int Rotation);
+/// <summary>Current oriented logical display size, rotation (0..3) and density (0 when unknown).</summary>
+public sealed record DisplayInfo(int Width, int Height, int Rotation, int DensityDpi);
 
 public static partial class AdbParsers
 {
@@ -41,7 +41,8 @@ public static partial class AdbParsers
             if (!o.Success || !f.Success) continue;
             int l = int.Parse(f.Groups[1].Value), t = int.Parse(f.Groups[2].Value), r = int.Parse(f.Groups[3].Value), b = int.Parse(f.Groups[4].Value);
             if (r - l <= 0 || b - t <= 0) continue;
-            return new DisplayInfo(r - l, b - t, int.Parse(o.Groups[1].Value));
+            var d = DensityRegex().Match(raw);
+            return new DisplayInfo(r - l, b - t, int.Parse(o.Groups[1].Value), d.Success ? int.Parse(d.Groups[1].Value) : 0);
         }
         return null;
     }
@@ -60,4 +61,7 @@ public static partial class AdbParsers
 
     [GeneratedRegex(@"logicalFrame=\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\]")]
     private static partial Regex LogicalFrameRegex();
+
+    [GeneratedRegex(@"densityDpi=(\d+)")]
+    private static partial Regex DensityRegex();
 }

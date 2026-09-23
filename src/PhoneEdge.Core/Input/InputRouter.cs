@@ -57,14 +57,15 @@ public sealed class InputRouter
     /// <summary>A mouse button is held while pushing against the edge (e.g. dragging files toward the phone); args are the cursor position.</summary>
     public event Action<int, int>? DragAtEdge;
 
-    public void SetPhoneReady(int width, int height)
+    /// <param name="pixelsPerCount">How far the phone moves its cursor per HID count (see <see cref="PointerTracker.PixelsPerCountFor"/>).</param>
+    public void SetPhoneReady(int width, int height, double pixelsPerCount)
     {
         lock (_lock)
         {
-            _phone = new PointerTracker(width, height, _cfg.Sensitivity);
+            _phone = new PointerTracker(width, height, _cfg.Sensitivity, pixelsPerCount);
             PhoneReady = true;
             _enter.Reset();
-            _log($"Phone ready: {width}x{height}");
+            _log($"Phone ready: {width}x{height}, {pixelsPerCount:0.###} px per count");
             _screenOffByUs = false; // a new server; the previous one turned the screen back on when it exited
             if (_desktopOpen && !OnPhone) TurnScreenOff();
         }
@@ -92,16 +93,16 @@ public sealed class InputRouter
         }
     }
 
-    public void UpdatePhoneBounds(int width, int height)
+    public void UpdatePhoneBounds(int width, int height, double pixelsPerCount)
     {
         lock (_lock)
         {
             if (_phone is null) return;
-            _phone.SetBounds(width, height);
-            _log($"Phone bounds updated: {width}x{height}");
+            _phone.SetBounds(width, height, pixelsPerCount);
+            _log($"Phone bounds updated: {width}x{height}, {pixelsPerCount:0.###} px per count");
             if (OnPhone)
             {
-                foreach (var (cx, cy) in MoveChunker.Resync(_phone.Width, _phone.Height, _phone.X, _phone.Y))
+                foreach (var (cx, cy) in _phone.Resync())
                     _sink.SendMouse(MouseReport.Encode(_buttons, cx, cy, 0, 0));
                 _log($"Resynced phone cursor to ({_phone.X},{_phone.Y}) after bounds change");
             }
@@ -149,16 +150,16 @@ public sealed class InputRouter
             return null;
         }
 
-        var (adx, ady) = _phone!.Move(dx, dy);
+        var (countX, countY) = _phone!.Move(dx, dy);
         bool back = EdgeGeometry.IsPushingBack(_cfg.Edge, _phone, dx, dy);
         if (_exit.Sample(back, _clock.NowMs))
         {
             ReturnToPcCore(sendReleases: true);
             return null;
         }
-        if (adx != 0 || ady != 0)
+        if (countX != 0 || countY != 0)
         {
-            foreach (var (cx, cy) in MoveChunker.Chunk(adx, ady))
+            foreach (var (cx, cy) in MoveChunker.Chunk(countX, countY))
                 _sink.SendMouse(MouseReport.Encode(_buttons, cx, cy, 0, 0));
         }
         return null;
@@ -253,7 +254,7 @@ public sealed class InputRouter
         _wheelAcc = _panAcc = 0;
         _keyboard.ReleaseAll();
         _exit.Reset();
-        foreach (var (cx, cy) in MoveChunker.Resync(_phone.Width, _phone.Height, tx, ty))
+        foreach (var (cx, cy) in _phone.Resync())
             _sink.SendMouse(MouseReport.Encode(HidMouseButtons.None, cx, cy, 0, 0));
         _log($"Entered phone at ({tx},{ty}) from PC ({_cursorX},{_cursorY})");
         _pendingModeChanges.Enqueue(true);
