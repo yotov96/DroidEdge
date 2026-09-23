@@ -69,6 +69,8 @@ public sealed class TrayApp : ApplicationContext
                 if (onPhone && _cfg.SyncClipboard && _phone is { } phone) _clipboard.OnEnteredPhone(phone.Channel);
             });
 
+            _desktop.Closed += () => Ui(() => _router.SetDesktopOpen(_desktop.IsOpen));
+
             _dropZone = new DropZoneWindow();
             _dropZone.FilesDropped += SendFiles;
             _router.DragAtEdge += (x, y) => Ui(() => ShowDropZone(x, y));
@@ -109,8 +111,14 @@ public sealed class TrayApp : ApplicationContext
 
     private void OpenDesktopFromTray()
     {
-        if (_phone is { } phone) _desktop.Open(phone.Serial, LoadFreshConfig(), bringToFront: true);
+        if (_phone is { } phone) OpenDesktop(phone, LoadFreshConfig(), bringToFront: true);
         else _tray.Balloon("PhoneEdge", "The phone is not connected", ToolTipIcon.Warning);
+    }
+
+    private void OpenDesktop(PhoneConnection phone, AppConfig cfg, bool bringToFront)
+    {
+        _desktop.Open(phone.Serial, cfg, bringToFront);
+        _router.SetDesktopOpen(_desktop.IsOpen);
     }
 
     private void ShowDropZone(int cursorX, int cursorY)
@@ -175,7 +183,7 @@ public sealed class TrayApp : ApplicationContext
             Ui(() =>
             {
                 var fresh = LoadFreshConfig();
-                if (fresh.OpenDesktopOnConnect) _desktop.Open(phone.Serial, fresh, bringToFront: false);
+                if (fresh.OpenDesktopOnConnect) OpenDesktop(phone, fresh, bringToFront: false);
             });
         };
         s.DisplayChanged += info => _router.UpdatePhoneBounds(info.Width, info.Height);

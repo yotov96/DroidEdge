@@ -6,9 +6,9 @@ namespace PhoneEdge.Core.Protocol;
 /// <summary>Encoders for the scrcpy 4.1 client→server control messages we use.</summary>
 public static class ControlMessages
 {
-    public const byte TypeInjectKeycode = 0;
     public const byte TypeBackOrScreenOn = 4;
     public const byte TypeSetClipboard = 9;
+    public const byte TypeSetDisplayPower = 10;
     public const byte TypeUhidCreate = 12;
     public const byte TypeUhidInput = 13;
     public const byte TypeUhidDestroy = 14;
@@ -46,19 +46,11 @@ public static class ControlMessages
         return buf;
     }
 
-    /// <summary>Android KeyEvent.KEYCODE_POWER; a press/release locks the phone like the physical button.</summary>
-    public const int KeycodePower = 26;
-
-    /// <summary>Injects an Android key event: action (0 down / 1 up), keycode, repeat 0, no meta state.</summary>
-    public static byte[] InjectKeycode(bool down, int keycode)
-    {
-        var buf = new byte[14];
-        buf[0] = TypeInjectKeycode;
-        buf[1] = down ? (byte)0 : (byte)1;
-        BinaryPrimitives.WriteInt32BigEndian(buf.AsSpan(2), keycode);
-        // bytes 6..13: repeat and metaState stay 0
-        return buf;
-    }
+    /// <summary>
+    /// Powers the phone's own display panel on or off. The phone stays awake and unlocked either way; the server
+    /// turns the panel back on when it exits.
+    /// </summary>
+    public static byte[] SetDisplayPower(bool on) => [TypeSetDisplayPower, on ? (byte)1 : (byte)0];
 
     /// <summary>Injects KEYCODE_BACK (or wakes the screen if it is off). Action byte: 0 = down, 1 = up.</summary>
     public static byte[] BackOrScreenOn(bool down) => [TypeBackOrScreenOn, down ? (byte)0 : (byte)1];

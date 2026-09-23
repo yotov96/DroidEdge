@@ -51,11 +51,11 @@ public class ControlMessagesTests
     }
 
     [Fact]
-    public void InjectKeycode_matches_scrcpy_layout()
+    public void SetDisplayPower_matches_scrcpy_layout()
     {
-        // type 0, action (0 down / 1 up), keycode, repeat, metaState as big-endian int32
-        Assert.Equal(new byte[] { 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0 }, ControlMessages.InjectKeycode(down: true, ControlMessages.KeycodePower));
-        Assert.Equal(new byte[] { 0, 1, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0 }, ControlMessages.InjectKeycode(down: false, ControlMessages.KeycodePower));
+        // type 10, then a boolean byte
+        Assert.Equal(new byte[] { 10, 1 }, ControlMessages.SetDisplayPower(on: true));
+        Assert.Equal(new byte[] { 10, 0 }, ControlMessages.SetDisplayPower(on: false));
     }
 
     [Fact]

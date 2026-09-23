@@ -12,11 +12,11 @@ public class InputRouterTests
         public List<byte[]> Mouse { get; } = new();
         public List<byte[]> Keyboard { get; } = new();
         public List<bool> Back { get; } = new();
-        public List<bool> Power { get; } = new();
+        public List<bool> DisplayPower { get; } = new();
         public bool SendMouse(byte[] r) { Mouse.Add(r); return true; }
         public bool SendKeyboard(byte[] r) { Keyboard.Add(r); return true; }
         public bool SendBack(bool down) { Back.Add(down); return true; }
-        public bool SendPower(bool down) { Power.Add(down); return true; }
+        public bool SendDisplayPower(bool on) { DisplayPower.Add(on); return true; }
     }
     private sealed class FakeCursor : ICursor
     {
@@ -227,8 +227,19 @@ public class InputRouterTests
         Assert.Empty(s.Back);
     }
 
+    /// <summary>Push back toward the PC at the phone's entry edge until the exit dwell returns the mouse.</summary>
+    private static void PushOut(InputRouter r, FakeClock k)
+    {
+        long t0 = k.NowMs + 100;
+        for (int t = 0; t <= 600 && r.OnPhone; t += 50)
+        {
+            k.NowMs = t0 + t;
+            r.OnRawMouseMove(3, 0);
+        }
+    }
+
     [Fact]
-    public void Middle_click_locks_the_phone_and_returns_to_pc()
+    public void Middle_click_turns_the_phone_screen_off_and_returns_to_pc()
     {
         var (r, s, c, g, k) = Make();
         r.SetPhoneReady(W, H);
@@ -236,14 +247,27 @@ public class InputRouterTests
         r.OnRawMouseButton(HidMouseButtons.Left, true); // a held button must be released by the return
         s.Mouse.Clear();
         r.OnRawMouseButton(HidMouseButtons.Middle, true);
-        Assert.Equal(new[] { true, false }, s.Power);
+        Assert.Equal(new[] { false }, s.DisplayPower);
         Assert.False(r.OnPhone);
         Assert.False(g.Swallow);
         Assert.Equal((1, 540), c.Pos);
         Assert.Equal(0, s.Mouse[^1][0]); // release report, no middle-button report
         Assert.DoesNotContain(s.Mouse, m => (m[0] & (byte)HidMouseButtons.Middle) != 0);
         r.OnRawMouseButton(HidMouseButtons.Middle, false); // the release arrives on the PC and is ignored
-        Assert.Equal(2, s.Power.Count);
+        Assert.Single(s.DisplayPower);
+    }
+
+    [Fact]
+    public void Crossing_after_middle_click_turns_the_screen_back_on()
+    {
+        var (r, s, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        PushIn(r, k);
+        r.OnRawMouseButton(HidMouseButtons.Middle, true);
+        r.OnRawMouseButton(HidMouseButtons.Middle, false);
+        PushIn(r, k);
+        Assert.True(r.OnPhone);
+        Assert.Equal(new[] { false, true }, s.DisplayPower);
     }
 
     [Fact]
@@ -254,9 +278,72 @@ public class InputRouterTests
         PushIn(r, k);
         s.Mouse.Clear();
         r.OnRawMouseButton(HidMouseButtons.Middle, true);
-        Assert.Empty(s.Power);
+        Assert.Empty(s.DisplayPower);
         Assert.True(r.OnPhone);
         Assert.Equal((byte)HidMouseButtons.Middle, s.Mouse[^1][0]);
+    }
+
+    [Fact]
+    public void With_the_desktop_open_the_screen_is_off_on_the_pc_and_on_while_on_the_phone()
+    {
+        var (r, s, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        r.SetDesktopOpen(true);
+        Assert.Equal(new[] { false }, s.DisplayPower);
+        PushIn(r, k);
+        Assert.Equal(new[] { false, true }, s.DisplayPower);
+        PushOut(r, k);
+        Assert.False(r.OnPhone);
+        Assert.Equal(new[] { false, true, false }, s.DisplayPower);
+    }
+
+    [Fact]
+    public void Without_the_desktop_crossing_leaves_the_screen_alone()
+    {
+        var (r, s, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        PushIn(r, k);
+        PushOut(r, k);
+        r.ReturnToPc();
+        Assert.False(r.OnPhone);
+        Assert.Empty(s.DisplayPower);
+    }
+
+    [Fact]
+    public void Opening_the_desktop_while_on_the_phone_waits_until_the_mouse_leaves()
+    {
+        var (r, s, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        PushIn(r, k);
+        r.SetDesktopOpen(true);
+        Assert.Empty(s.DisplayPower);
+        r.ReturnToPc(); // panic hotkey / tray path
+        Assert.Equal(new[] { false }, s.DisplayPower);
+    }
+
+    [Fact]
+    public void Reconnecting_with_the_desktop_open_turns_the_screen_off_again()
+    {
+        // The old server's cleanup turns the screen back on when the connection drops.
+        var (r, s, _, _, _) = Make();
+        r.SetPhoneReady(W, H);
+        r.SetDesktopOpen(true);
+        r.SetPhoneUnavailable();
+        r.SetPhoneReady(W, H);
+        Assert.Equal(new[] { false, false }, s.DisplayPower);
+    }
+
+    [Fact]
+    public void After_the_desktop_closes_leaving_the_phone_no_longer_turns_the_screen_off()
+    {
+        var (r, s, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        r.SetDesktopOpen(true);
+        r.SetDesktopOpen(false);
+        PushIn(r, k);
+        PushOut(r, k);
+        Assert.False(r.OnPhone);
+        Assert.Equal(new[] { false, true }, s.DisplayPower);
     }
 
     [Fact]

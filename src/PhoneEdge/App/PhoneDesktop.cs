@@ -25,10 +25,16 @@ public sealed class PhoneDesktop : IDisposable
 
     public bool IsOpen => _process is { HasExited: false };
 
+    /// <summary>The scrcpy process exited (window closed, phone unplugged). Raised on a thread-pool thread.</summary>
+    public event Action? Closed;
+
     public static List<string> BuildArguments(string serial, AppConfig cfg)
     {
         var args = new List<string> { "-s", serial, cfg.DesktopDisplay.Length == 0 ? "--new-display" : $"--new-display={cfg.DesktopDisplay}" };
         if (cfg.DesktopFlex) args.Add("--flex-display");
+        // Using the virtual display does not count as activity for the phone's own screen, so without --stay-awake
+        // the phone sleeps and locks after its screen timeout. scrcpy restores the setting when the window closes.
+        args.Add("--stay-awake");
         // Clipboard is handled by our own connection; closing the window moves its apps to the phone screen instead of killing them.
         args.AddRange(["--no-audio", "--no-clipboard-autosync", "--no-vd-destroy-content", $"--window-title={WindowTitle}"]);
         return args;
@@ -56,7 +62,11 @@ public sealed class PhoneDesktop : IDisposable
         var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
         p.OutputDataReceived += (_, e) => { if (e.Data is not null) _log.Information("[desktop] {Line}", e.Data); };
         p.ErrorDataReceived += (_, e) => { if (e.Data is not null) _log.Information("[desktop] {Line}", e.Data); };
-        p.Exited += (_, _) => _log.Information("Phone desktop closed");
+        p.Exited += (_, _) =>
+        {
+            _log.Information("Phone desktop closed");
+            Closed?.Invoke();
+        };
         p.Start();
         p.BeginOutputReadLine();
         p.BeginErrorReadLine();

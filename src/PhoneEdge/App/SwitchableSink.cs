@@ -10,5 +10,5 @@ public sealed class SwitchableSink : IReportSink
     public bool SendMouse(byte[] report) => _target?.SendMouse(report) ?? false;
     public bool SendKeyboard(byte[] report) => _target?.SendKeyboard(report) ?? false;
     public bool SendBack(bool down) => _target?.SendBack(down) ?? false;
-    public bool SendPower(bool down) => _target?.SendPower(down) ?? false;
+    public bool SendDisplayPower(bool on) => _target?.SendDisplayPower(on) ?? false;
 }

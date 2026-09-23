@@ -6,12 +6,12 @@ namespace PhoneEdge.Tests;
 public class PhoneDesktopTests
 {
     [Fact]
-    public void Arguments_create_a_flexible_virtual_display_without_audio_or_clipboard_autosync()
+    public void Arguments_create_a_flexible_virtual_display_that_keeps_the_phone_awake()
     {
         var args = PhoneDesktop.BuildArguments("SER1", AppConfig.Default);
         Assert.Equal(new[]
         {
-            "-s", "SER1", "--new-display=1920x1080", "--flex-display", "--no-audio",
+            "-s", "SER1", "--new-display=1920x1080", "--flex-display", "--stay-awake", "--no-audio",
             "--no-clipboard-autosync", "--no-vd-destroy-content", "--window-title=Phone desktop",
         }, args);
     }

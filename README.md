@@ -10,7 +10,7 @@ Move your mouse past a monitor edge and it appears on your USB-connected Android
 - `.\publish.ps1` then start `dist\PhoneEdge.exe`; it lives in the tray.
 - Push the mouse against the **left edge of the primary monitor for 1 s** to cross. Push against the phone's right edge for 1 s to come back.
 - Right-click is Android **Back** (set `rightClickIsBack` to `false` to send it as a normal secondary button instead).
-- Middle-click (wheel click) is **"I'm done"**: it locks the phone with a Power press and returns the mouse to the PC (set `middleClickIsDone` to `false` for a normal middle button). Requires the phone's "Power button instantly locks" setting, which is the default.
+- Middle-click (wheel click) is **"I'm done"**: it turns the phone screen off and returns the mouse to the PC (set `middleClickIsDone` to `false` for a normal middle button). It does not lock the phone: without the phone desktop open, the phone locks after its normal screen timeout. Crossing back turns the screen on again.
 - Panic: hold **Left Ctrl + Right Ctrl** to return instantly.
 - Crossing never happens while a mouse button is held.
 - `PhoneEdge.exe --diag` runs an end-to-end check and shows a report.
@@ -28,6 +28,8 @@ GlazeWM may try to tile the drop zone; if so, add an ignore rule for the window 
 
 ## Phone desktop
 A second window (`scrcpy.exe`) shows a virtual display created on the phone, with its own taskbar and launcher. It opens when the phone connects (`openDesktopOnConnect`). Minimize or close it freely: it has its own connection, and tray → **Open phone desktop** reopens it. Closing it removes the virtual display; apps that were open there move to the phone screen.
+
+While the desktop window is open the phone is kept awake (scrcpy `--stay-awake`, restored when the window closes), and its own screen is dark except while the mouse is on it. **The phone stays unlocked the whole time the desktop is open**; the physical power button still locks it. Clicking or touching the dark screen does not light it: Android considers it on, so input goes to the app underneath. Cross the mouse over to light it.
 
 - `desktopDisplay`: initial size and density in scrcpy's syntax, e.g. `"1920x1080"`, `"1440x1800/240"`, `"/240"` (phone size, 240 dpi) or `""` (phone size and density). Higher dpi means bigger UI.
 - `desktopFlex` (default `true`): the virtual display keeps resizing to match the window, so it fits whatever size your window manager gives it.

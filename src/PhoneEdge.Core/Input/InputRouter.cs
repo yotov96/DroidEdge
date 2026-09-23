@@ -28,6 +28,9 @@ public sealed class InputRouter
     // Buttons held on the PC. Crossing while one is held would swallow its release and leave Windows thinking it is still down.
     private HidMouseButtons _pcButtons;
     private bool _dragAtEdgeRaised;
+    // The phone desktop keeps the phone awake, so its own screen is only lit while the mouse is on it.
+    private bool _desktopOpen;
+    private bool _screenOffByUs;
     private int _wheelAcc, _panAcc;
     private int _cursorX, _cursorY;
     private readonly Queue<bool> _pendingModeChanges = new();
@@ -62,6 +65,8 @@ public sealed class InputRouter
             PhoneReady = true;
             _enter.Reset();
             _log($"Phone ready: {width}x{height}");
+            _screenOffByUs = false; // a new server; the previous one turned the screen back on when it exited
+            if (_desktopOpen && !OnPhone) TurnScreenOff();
         }
     }
 
@@ -72,8 +77,19 @@ public sealed class InputRouter
             ReturnToPcCore(sendReleases: false);
             PhoneReady = false;
             _phone = null;
+            _screenOffByUs = false;
         }
         FlushModeChanged();
+    }
+
+    /// <summary>The phone desktop window opened or closed.</summary>
+    public void SetDesktopOpen(bool open)
+    {
+        lock (_lock)
+        {
+            _desktopOpen = open;
+            if (open && PhoneReady && !OnPhone) TurnScreenOff();
+        }
     }
 
     public void UpdatePhoneBounds(int width, int height)
@@ -175,11 +191,10 @@ public sealed class InputRouter
         }
         if (button == HidMouseButtons.Middle && _cfg.MiddleClickIsDone)
         {
-            // "I'm done": lock the phone (Power press/release) and hand the mouse back to the PC.
+            // "I'm done": turn the phone screen off and hand the mouse back to the PC.
             if (!down) return;
-            _sink.SendPower(true);
-            _sink.SendPower(false);
-            _log("Middle click: locking phone and returning to PC");
+            _log("Middle click: turning the phone screen off and returning to PC");
+            TurnScreenOff();
             ReturnToPcCore(sendReleases: true);
             return;
         }
@@ -228,6 +243,7 @@ public sealed class InputRouter
         if (_phone is null) return;
         OnPhone = true;
         _gate.Swallow = true;
+        TurnScreenOn();
         double fraction = EdgeGeometry.Fraction(_cfg.Edge, _monitor, _cursorX, _cursorY);
         var (px, py) = EdgeGeometry.PointOnEdge(_cfg.Edge, _monitor, fraction, inset: 1);
         _cursor.SetPosition(px, py);
@@ -262,11 +278,28 @@ public sealed class InputRouter
         {
             if (_buttons != HidMouseButtons.None) _sink.SendMouse(MouseReport.Encode(HidMouseButtons.None, 0, 0, 0, 0));
             if (_cfg.ForwardKeyboard) _sink.SendKeyboard(KeyboardState.EmptyReport);
+            if (_desktopOpen) TurnScreenOff();
         }
         _buttons = HidMouseButtons.None;
         _keyboard.ReleaseAll();
         _log("Returned to PC");
         _pendingModeChanges.Enqueue(false);
+    }
+
+    // Caller holds _lock.
+    private void TurnScreenOff()
+    {
+        if (_screenOffByUs) return;
+        _sink.SendDisplayPower(false);
+        _screenOffByUs = true;
+    }
+
+    // Caller holds _lock. Only turns on a screen we turned off, so a phone that is asleep or locked is left alone.
+    private void TurnScreenOn()
+    {
+        if (!_screenOffByUs) return;
+        _sink.SendDisplayPower(true);
+        _screenOffByUs = false;
     }
 
     // Called after the lock is released so subscribers can block or call back into the router safely.

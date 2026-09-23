@@ -43,7 +43,7 @@ public sealed class ControlChannel : IReportSink, IDisposable
     // Called from the input path, so these must not stall: give up quickly if the queue is full.
     private static readonly TimeSpan InputPathTimeout = TimeSpan.FromMilliseconds(20);
     public bool SendBack(bool down) => _queue.EnqueueRaw(ControlMessages.BackOrScreenOn(down), InputPathTimeout);
-    public bool SendPower(bool down) => _queue.EnqueueRaw(ControlMessages.InjectKeycode(down, ControlMessages.KeycodePower), InputPathTimeout);
+    public bool SendDisplayPower(bool on) => _queue.EnqueueRaw(ControlMessages.SetDisplayPower(on), InputPathTimeout);
     public void SendRaw(byte[] framed)
     {
         if (!_queue.EnqueueRaw(framed, RawEnqueueTimeout))
