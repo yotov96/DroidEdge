@@ -153,6 +153,47 @@ public class InputRouterTests
     }
 
     [Fact]
+    public void Does_not_cross_while_a_mouse_button_is_held_and_raises_drag_at_edge_instead()
+    {
+        var (r, _, _, g, k) = Make();
+        r.SetPhoneReady(W, H);
+        var drags = new List<(int x, int y)>();
+        r.DragAtEdge += (x, y) => drags.Add((x, y));
+        r.OnRawMouseButton(HidMouseButtons.Left, true); // pressed on the PC, e.g. dragging a file
+        r.OnCursorMoved(-2, 300);
+        for (int t = 0; t <= 1500; t += 50) { k.NowMs = t; r.OnRawMouseMove(-3, 0); }
+        Assert.False(r.OnPhone);
+        Assert.False(g.Swallow);
+        Assert.Equal((-2, 300), Assert.Single(drags)); // raised once per hold, not on every dwell
+    }
+
+    [Fact]
+    public void Crossing_works_again_after_the_button_is_released()
+    {
+        var (r, _, _, _, k) = Make();
+        r.SetPhoneReady(W, H);
+        r.OnRawMouseButton(HidMouseButtons.Left, true);
+        r.OnCursorMoved(0, 540);
+        for (int t = 0; t <= 1500; t += 50) { k.NowMs = t; r.OnRawMouseMove(-2, 0); }
+        r.OnRawMouseButton(HidMouseButtons.Left, false);
+        k.NowMs = 2000;
+        for (int t = 2000; t <= 3100 && !r.OnPhone; t += 50) { k.NowMs = t; r.OnRawMouseMove(-2, 0); }
+        Assert.True(r.OnPhone);
+    }
+
+    [Fact]
+    public void Drag_at_edge_is_not_raised_when_the_phone_is_not_ready()
+    {
+        var (r, _, _, _, k) = Make();
+        int drags = 0;
+        r.DragAtEdge += (_, _) => drags++;
+        r.OnRawMouseButton(HidMouseButtons.Left, true);
+        r.OnCursorMoved(0, 540);
+        for (int t = 0; t <= 1500; t += 50) { k.NowMs = t; r.OnRawMouseMove(-2, 0); }
+        Assert.Equal(0, drags);
+    }
+
+    [Fact]
     public void Right_click_sends_back_instead_of_a_secondary_button()
     {
         var (r, s, _, _, k) = Make();

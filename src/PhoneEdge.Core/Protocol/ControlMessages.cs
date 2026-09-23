@@ -8,9 +8,43 @@ public static class ControlMessages
 {
     public const byte TypeInjectKeycode = 0;
     public const byte TypeBackOrScreenOn = 4;
+    public const byte TypeSetClipboard = 9;
     public const byte TypeUhidCreate = 12;
     public const byte TypeUhidInput = 13;
     public const byte TypeUhidDestroy = 14;
+    public const byte TypeScanFile = 22;
+
+    /// <summary>The server reads control messages into a 256 KiB buffer; SET_CLIPBOARD has 14 bytes of header.</summary>
+    public const int MaxClipboardTextBytes = (1 << 18) - 14;
+    public const int MaxScanFilePathBytes = 256;
+
+    /// <summary>Sets the phone clipboard. Sequence 0 asks for no acknowledgement; paste=true would also inject a paste.</summary>
+    public static byte[] SetClipboard(ulong sequence, string text, bool paste)
+    {
+        var bytes = Encoding.UTF8.GetBytes(text);
+        if (bytes.Length > MaxClipboardTextBytes)
+            throw new ArgumentException($"clipboard text is {bytes.Length} bytes; the limit is {MaxClipboardTextBytes}", nameof(text));
+        var buf = new byte[14 + bytes.Length];
+        buf[0] = TypeSetClipboard;
+        BinaryPrimitives.WriteUInt64BigEndian(buf.AsSpan(1), sequence);
+        buf[9] = paste ? (byte)1 : (byte)0;
+        BinaryPrimitives.WriteUInt32BigEndian(buf.AsSpan(10), (uint)bytes.Length);
+        bytes.CopyTo(buf, 14);
+        return buf;
+    }
+
+    /// <summary>Asks the phone to index a file it received so it shows up in Files/Photos.</summary>
+    public static byte[] ScanFile(string devicePath)
+    {
+        var bytes = Encoding.UTF8.GetBytes(devicePath);
+        if (bytes.Length > MaxScanFilePathBytes)
+            throw new ArgumentException($"path is {bytes.Length} bytes; the limit is {MaxScanFilePathBytes}", nameof(devicePath));
+        var buf = new byte[5 + bytes.Length];
+        buf[0] = TypeScanFile;
+        BinaryPrimitives.WriteUInt32BigEndian(buf.AsSpan(1), (uint)bytes.Length);
+        bytes.CopyTo(buf, 5);
+        return buf;
+    }
 
     /// <summary>Android KeyEvent.KEYCODE_POWER; a press/release locks the phone like the physical button.</summary>
     public const int KeycodePower = 26;

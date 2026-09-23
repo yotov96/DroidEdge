@@ -25,6 +25,8 @@ public sealed class ControlChannel : IReportSink, IDisposable
     }
 
     public event Action<Exception?>? ConnectionLost;
+    /// <summary>The phone clipboard changed (only sent when the server runs with clipboard autosync). Raised on the receiver thread.</summary>
+    public event Action<string>? ClipboardChanged;
     public bool IsAlive => _lostSignalled == 0 && !_disposed;
 
     public void Start()
@@ -47,6 +49,11 @@ public sealed class ControlChannel : IReportSink, IDisposable
         if (!_queue.EnqueueRaw(framed, RawEnqueueTimeout))
             _log.Warning("Control message dropped: queue full for {Ms} ms", RawEnqueueTimeout.TotalMilliseconds);
     }
+
+    /// <summary>Caller checks the text against <see cref="ControlMessages.MaxClipboardTextBytes"/>.</summary>
+    public bool SendClipboard(string text) => _queue.EnqueueRaw(ControlMessages.SetClipboard(0, text, paste: false), RawEnqueueTimeout);
+
+    public bool SendScanFile(string devicePath) => _queue.EnqueueRaw(ControlMessages.ScanFile(devicePath), RawEnqueueTimeout);
 
     public void CreateDevices()
     {
@@ -89,7 +96,17 @@ public sealed class ControlChannel : IReportSink, IDisposable
             {
                 var msg = DeviceMessageReader.Read(_conn.Stream);
                 if (msg is null) { SignalLost(new IOException("server closed the control socket")); return; }
-                _log.Debug("Device message: {Msg}", msg);
+                if (msg is ClipboardMessage clip)
+                {
+                    _log.Debug("Phone clipboard changed ({Chars} chars)", clip.Text.Length); // never log the text itself
+                    // A throwing subscriber must not end up in the catch below, which would drop the connection.
+                    try { ClipboardChanged?.Invoke(clip.Text); }
+                    catch (Exception ex) { _log.Error(ex, "ClipboardChanged subscriber threw"); }
+                }
+                else
+                {
+                    _log.Debug("Device message: {Msg}", msg);
+                }
             }
         }
         catch (Exception ex)

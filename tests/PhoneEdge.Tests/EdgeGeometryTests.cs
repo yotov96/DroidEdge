@@ -30,6 +30,17 @@ public class EdgeGeometryTests
     }
 
     [Fact]
+    public void DropZoneBounds_sit_flush_on_the_edge_centred_on_the_cursor_and_inside_the_monitor()
+    {
+        Assert.Equal(new IntRect(0, 470, 200, 610), EdgeGeometry.DropZoneBounds(Edge.Left, Mon, -4, 540, 200, 140));
+        Assert.Equal(new IntRect(0, 0, 200, 140), EdgeGeometry.DropZoneBounds(Edge.Left, Mon, 0, 10, 200, 140));      // clamped at the top
+        Assert.Equal(new IntRect(0, 940, 200, 1080), EdgeGeometry.DropZoneBounds(Edge.Left, Mon, 0, 1075, 200, 140)); // clamped at the bottom
+        Assert.Equal(new IntRect(1720, 470, 1920, 610), EdgeGeometry.DropZoneBounds(Edge.Right, Mon, 1925, 540, 200, 140));
+        Assert.Equal(new IntRect(860, 0, 1060, 140), EdgeGeometry.DropZoneBounds(Edge.Top, Mon, 960, -3, 200, 140));
+        Assert.Equal(new IntRect(860, 940, 1060, 1080), EdgeGeometry.DropZoneBounds(Edge.Bottom, Mon, 960, 1083, 200, 140));
+    }
+
+    [Fact]
     public void Right_top_bottom_edges()
     {
         Assert.True(EdgeGeometry.IsPushingOut(Edge.Right, new IntRect(1919, 0, 1920, 1080), 1919, 10, 2, 0));

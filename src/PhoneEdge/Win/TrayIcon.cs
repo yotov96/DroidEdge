@@ -12,7 +12,7 @@ public sealed class TrayIcon : IDisposable
     private readonly Dictionary<TrayColor, Icon> _icons = new();
     private bool _suppressStartupEvent;
 
-    public TrayIcon(Action onReturnMouse, Action onDiagnostics, Action onOpenLog, Action onOpenConfig, Action<bool> onStartupToggle, Action onExit)
+    public TrayIcon(Action onOpenDesktop, Action onSendFiles, Action onReturnMouse, Action onDiagnostics, Action onOpenLog, Action onOpenConfig, Action<bool> onStartupToggle, Action onExit)
     {
         UiControl = new Control();
         _ = UiControl.Handle; // force creation on this (UI) thread so BeginInvoke works from other threads
@@ -25,6 +25,9 @@ public sealed class TrayIcon : IDisposable
 
         var menu = new ContextMenuStrip();
         menu.Items.Add(_status);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Open phone desktop", null, (_, _) => onOpenDesktop());
+        menu.Items.Add("Send files to phone…", null, (_, _) => onSendFiles());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Return mouse to PC", null, (_, _) => onReturnMouse());
         menu.Items.Add("Run diagnostics", null, (_, _) => onDiagnostics());

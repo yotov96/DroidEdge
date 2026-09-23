@@ -15,6 +15,14 @@ public sealed record AppConfig
     public bool RightClickIsBack { get; init; } = true;
     /// <summary>Middle-click while on the phone locks the phone (Power press) and returns the mouse to the PC.</summary>
     public bool MiddleClickIsDone { get; init; } = true;
+    /// <summary>Phone copies land in the Windows clipboard; the Windows clipboard is sent to the phone when crossing.</summary>
+    public bool SyncClipboard { get; init; } = true;
+    /// <summary>Open the phone desktop window (scrcpy virtual display) whenever the phone connects.</summary>
+    public bool OpenDesktopOnConnect { get; init; } = true;
+    /// <summary>Virtual display size and density in scrcpy's --new-display syntax: "WxH", "WxH/dpi", "/dpi", or "" for the phone's own.</summary>
+    public string DesktopDisplay { get; init; } = "1920x1080";
+    /// <summary>Resize the virtual display to follow the window (scrcpy --flex-display).</summary>
+    public bool DesktopFlex { get; init; } = true;
     public string[] PanicHotkey { get; init; } = ["LControl", "RControl"];
     public string LogLevel { get; init; } = "Info";
 
@@ -25,7 +33,8 @@ public sealed record AppConfig
         ScrcpyDir == other.ScrcpyDir && DeviceSerial == other.DeviceSerial && Edge == other.Edge &&
         Monitor == other.Monitor && EnterDwellMs == other.EnterDwellMs && ExitDwellMs == other.ExitDwellMs &&
         Sensitivity == other.Sensitivity && ForwardKeyboard == other.ForwardKeyboard && RightClickIsBack == other.RightClickIsBack &&
-        MiddleClickIsDone == other.MiddleClickIsDone &&
+        MiddleClickIsDone == other.MiddleClickIsDone && SyncClipboard == other.SyncClipboard &&
+        OpenDesktopOnConnect == other.OpenDesktopOnConnect && DesktopDisplay == other.DesktopDisplay && DesktopFlex == other.DesktopFlex &&
         PanicHotkey.SequenceEqual(other.PanicHotkey) && LogLevel == other.LogLevel;
 
     public override int GetHashCode() => HashCode.Combine(ScrcpyDir, Edge, Monitor, EnterDwellMs, ExitDwellMs, Sensitivity, ForwardKeyboard, LogLevel);

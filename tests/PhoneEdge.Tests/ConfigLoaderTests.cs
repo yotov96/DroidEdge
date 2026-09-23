@@ -18,7 +18,27 @@ public class ConfigLoaderTests
         Assert.True(cfg.ForwardKeyboard);
         Assert.True(cfg.RightClickIsBack);
         Assert.True(cfg.MiddleClickIsDone);
+        Assert.True(cfg.SyncClipboard);
+        Assert.True(cfg.OpenDesktopOnConnect);
+        Assert.Equal("1920x1080", cfg.DesktopDisplay);
+        Assert.True(cfg.DesktopFlex);
         Assert.Equal(new[] { "LControl", "RControl" }, cfg.PanicHotkey);
+    }
+
+    [Fact]
+    public void Desktop_options_are_parsed_and_validated()
+    {
+        var cfg = ConfigLoader.Parse("""{"syncClipboard":false,"openDesktopOnConnect":false,"desktopDisplay":"1440x1800/240","desktopFlex":false}""", _ => { });
+        Assert.False(cfg.SyncClipboard);
+        Assert.False(cfg.OpenDesktopOnConnect);
+        Assert.Equal("1440x1800/240", cfg.DesktopDisplay);
+        Assert.False(cfg.DesktopFlex);
+        Assert.Equal("/200", ConfigLoader.Parse("""{"desktopDisplay":"/200"}""", _ => { }).DesktopDisplay);
+        Assert.Equal("", ConfigLoader.Parse("""{"desktopDisplay":""}""", _ => { }).DesktopDisplay);
+
+        var warnings = new List<string>();
+        Assert.Equal("1920x1080", ConfigLoader.Parse("""{"desktopDisplay":"big"}""", warnings.Add).DesktopDisplay);
+        Assert.Single(warnings);
     }
 
     [Fact]

@@ -24,6 +24,24 @@ public static class EdgeGeometry
         };
     }
 
+    /// <summary>A width×height rectangle flush against the edge, centred on the cursor along it, kept inside the monitor.</summary>
+    public static IntRect DropZoneBounds(Edge edge, IntRect monitor, int cx, int cy, int width, int height)
+    {
+        int left = edge switch
+        {
+            Edge.Left => monitor.Left,
+            Edge.Right => monitor.Right - width,
+            _ => Math.Clamp(cx - width / 2, monitor.Left, monitor.Right - width),
+        };
+        int top = edge switch
+        {
+            Edge.Top => monitor.Top,
+            Edge.Bottom => monitor.Bottom - height,
+            _ => Math.Clamp(cy - height / 2, monitor.Top, monitor.Bottom - height),
+        };
+        return new IntRect(left, top, left + width, top + height);
+    }
+
     public static double Fraction(Edge edge, IntRect monitor, int cx, int cy)
     {
         double f = edge is Edge.Left or Edge.Right

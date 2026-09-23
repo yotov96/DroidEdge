@@ -17,9 +17,15 @@ public static class ConfigLoader
         public bool? ForwardKeyboard { get; set; }
         public bool? RightClickIsBack { get; set; }
         public bool? MiddleClickIsDone { get; set; }
+        public bool? SyncClipboard { get; set; }
+        public bool? OpenDesktopOnConnect { get; set; }
+        public string? DesktopDisplay { get; set; }
+        public bool? DesktopFlex { get; set; }
         public string[]? PanicHotkey { get; set; }
         public string? LogLevel { get; set; }
     }
+
+    private static readonly System.Text.RegularExpressions.Regex DesktopDisplayPattern = new(@"^(\d{2,5}x\d{2,5})?(/\d{2,4})?$");
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -70,6 +76,13 @@ public static class ConfigLoader
             else warn($"Config 'sensitivity' must be in (0, 20], got {s}; using {d.Sensitivity}");
         }
 
+        string desktopDisplay = d.DesktopDisplay;
+        if (dto.DesktopDisplay is not null)
+        {
+            if (DesktopDisplayPattern.IsMatch(dto.DesktopDisplay)) desktopDisplay = dto.DesktopDisplay;
+            else warn($"Config 'desktopDisplay' must look like 1920x1080, 1920x1080/240, /240 or be empty, got '{dto.DesktopDisplay}'; using {d.DesktopDisplay}");
+        }
+
         string[] hotkey = d.PanicHotkey;
         if (dto.PanicHotkey is not null)
         {
@@ -89,6 +102,10 @@ public static class ConfigLoader
             ForwardKeyboard = dto.ForwardKeyboard ?? d.ForwardKeyboard,
             RightClickIsBack = dto.RightClickIsBack ?? d.RightClickIsBack,
             MiddleClickIsDone = dto.MiddleClickIsDone ?? d.MiddleClickIsDone,
+            SyncClipboard = dto.SyncClipboard ?? d.SyncClipboard,
+            OpenDesktopOnConnect = dto.OpenDesktopOnConnect ?? d.OpenDesktopOnConnect,
+            DesktopDisplay = desktopDisplay,
+            DesktopFlex = dto.DesktopFlex ?? d.DesktopFlex,
             PanicHotkey = hotkey,
             LogLevel = string.IsNullOrWhiteSpace(dto.LogLevel) ? d.LogLevel : dto.LogLevel,
         };

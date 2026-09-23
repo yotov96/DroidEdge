@@ -32,7 +32,7 @@ public sealed class PhoneSession : IDisposable
 
     public SessionState State { get; private set; } = SessionState.Stopped;
     public event Action<SessionState, string>? StateChanged;
-    public event Action<IReportSink, DisplayInfo>? Connected;
+    public event Action<PhoneConnection, DisplayInfo>? Connected;
     public event Action<DisplayInfo>? DisplayChanged;
     public event Action? Disconnected;
 
@@ -86,7 +86,7 @@ public sealed class PhoneSession : IDisposable
             try
             {
                 SetState(SessionState.Bootstrapping, $"Connecting to {device.Serial}");
-                var conn = await ServerBootstrap.StartAsync(adb, _jarPath, _log, ct);
+                var conn = await ServerBootstrap.StartAsync(adb, _jarPath, _cfg.SyncClipboard, _log, ct);
                 channel = new ControlChannel(conn, _log);
                 var lost = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 channel.ConnectionLost += _ => lost.TrySetResult();
@@ -97,7 +97,8 @@ public sealed class PhoneSession : IDisposable
 
                 readyAt = DateTime.UtcNow;
                 SetState(SessionState.Ready, $"{conn.DeviceName} ({info.Width}x{info.Height})");
-                Raise(() => Connected?.Invoke(channel, info), nameof(Connected));
+                var phone = new PhoneConnection(adb, channel);
+                Raise(() => Connected?.Invoke(phone, info), nameof(Connected));
 
                 while (!ct.IsCancellationRequested && !lost.Task.IsCompleted)
                 {

@@ -47,15 +47,18 @@ public sealed class ServerConnection : IDisposable
 public static class ServerBootstrap
 {
     public const string ServerVersion = "4.1";
-    public const string DeviceServerPath = "/data/local/tmp/scrcpy-server.jar";
+    // Not scrcpy's default path: scrcpy.exe (the phone desktop window) pushes there, and each server deletes its own jar on exit.
+    public const string DeviceServerPath = "/data/local/tmp/phoneedge-server.jar";
+    // Matches only our control-only server ("video=false audio=false"), never a scrcpy.exe server such as the phone desktop's.
+    private const string OwnServerPattern = "'com\\.genymobile\\.scrcpy\\.Server .*video=false audio=false'";
     private const int DeviceNameFieldLength = 64;
 
-    public static async Task<ServerConnection> StartAsync(Adb adb, string serverJarPath, ILogger log, CancellationToken ct)
+    public static async Task<ServerConnection> StartAsync(Adb adb, string serverJarPath, bool clipboardAutosync, ILogger log, CancellationToken ct)
     {
         if (!File.Exists(serverJarPath)) throw new FileNotFoundException("scrcpy-server not found", serverJarPath);
 
-        // 1. Kill a stale server from a previous crash (best effort).
-        await adb.ShellAsync(ct, "pkill", "-f", "com.genymobile.scrcpy");
+        // 1. Kill a stale server of ours from a previous crash (best effort).
+        await adb.ShellAsync(ct, "pkill", "-f", OwnServerPattern);
 
         // 2. Push the server.
         var push = await adb.RunAsync(TimeSpan.FromSeconds(30), ct, "push", serverJarPath, DeviceServerPath);
@@ -74,7 +77,7 @@ public static class ServerBootstrap
         {
             proc = adb.StartLongRunning("shell",
                 $"CLASSPATH={DeviceServerPath}", "app_process", "/", "com.genymobile.scrcpy.Server", ServerVersion,
-                $"scid={scid:x8}", "log_level=info", "video=false", "audio=false", "tunnel_forward=true", "clipboard_autosync=false");
+                $"scid={scid:x8}", "log_level=info", "video=false", "audio=false", "tunnel_forward=true", $"clipboard_autosync={(clipboardAutosync ? "true" : "false")}");
         }
         catch
         {

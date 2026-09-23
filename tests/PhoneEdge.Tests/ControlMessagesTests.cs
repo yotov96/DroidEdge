@@ -59,6 +59,29 @@ public class ControlMessagesTests
     }
 
     [Fact]
+    public void SetClipboard_matches_scrcpy_layout()
+    {
+        // type 9, u64 sequence, u8 paste, u32 length, UTF-8 text
+        var msg = ControlMessages.SetClipboard(0x0102, "hé", paste: false);
+        Assert.Equal(new byte[] { 9, 0, 0, 0, 0, 0, 0, 0x01, 0x02, 0, 0, 0, 0, 3, (byte)'h', 0xC3, 0xA9 }, msg);
+    }
+
+    [Fact]
+    public void SetClipboard_rejects_text_over_the_server_limit()
+    {
+        Assert.Throws<ArgumentException>(() => ControlMessages.SetClipboard(0, new string('x', ControlMessages.MaxClipboardTextBytes + 1), false));
+        Assert.Equal(14 + ControlMessages.MaxClipboardTextBytes, ControlMessages.SetClipboard(0, new string('x', ControlMessages.MaxClipboardTextBytes), false).Length);
+    }
+
+    [Fact]
+    public void ScanFile_matches_scrcpy_layout()
+    {
+        // type 22, u32 length, UTF-8 path
+        Assert.Equal(new byte[] { 22, 0, 0, 0, 3, (byte)'/', (byte)'a', (byte)'b' }, ControlMessages.ScanFile("/ab"));
+        Assert.Throws<ArgumentException>(() => ControlMessages.ScanFile(new string('x', 257)));
+    }
+
+    [Fact]
     public void BackOrScreenOn_matches_scrcpy_layout()
     {
         // type 4, then the Android key action: 0 = down, 1 = up

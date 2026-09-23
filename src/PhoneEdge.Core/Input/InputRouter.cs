@@ -7,6 +7,7 @@ namespace PhoneEdge.Core.Input;
 public sealed class InputRouter
 {
     private const int WheelDelta = 120;
+    private const int DragAtEdgeDwellMs = 300;
 
     private readonly AppConfig _cfg;
     private readonly IntRect _monitor;
@@ -20,9 +21,13 @@ public sealed class InputRouter
 
     private readonly DwellTrigger _enter;
     private readonly DwellTrigger _exit;
+    private readonly DwellTrigger _dragAtEdge = new(DragAtEdgeDwellMs);
     private readonly KeyboardState _keyboard = new();
     private PointerTracker? _phone;
     private HidMouseButtons _buttons;
+    // Buttons held on the PC. Crossing while one is held would swallow its release and leave Windows thinking it is still down.
+    private HidMouseButtons _pcButtons;
+    private bool _dragAtEdgeRaised;
     private int _wheelAcc, _panAcc;
     private int _cursorX, _cursorY;
     private readonly Queue<bool> _pendingModeChanges = new();
@@ -46,6 +51,8 @@ public sealed class InputRouter
     public bool OnPhone { get; private set; }
     public bool PhoneReady { get; private set; }
     public event Action<bool>? ModeChanged;
+    /// <summary>A mouse button is held while pushing against the edge (e.g. dragging files toward the phone); args are the cursor position.</summary>
+    public event Action<int, int>? DragAtEdge;
 
     public void SetPhoneReady(int width, int height)
     {
@@ -96,22 +103,34 @@ public sealed class InputRouter
 
     public void OnRawMouseMove(int dx, int dy)
     {
+        (int x, int y)? dragAt;
         lock (_lock)
         {
-            OnRawMouseMoveLocked(dx, dy);
+            dragAt = OnRawMouseMoveLocked(dx, dy);
         }
         FlushModeChanged();
+        if (dragAt is var (x, y))
+        {
+            try { DragAtEdge?.Invoke(x, y); }
+            catch (Exception ex) { _log($"DragAtEdge subscriber threw: {ex}"); }
+        }
     }
 
-    // Caller holds _lock.
-    private void OnRawMouseMoveLocked(int dx, int dy)
+    // Caller holds _lock. Returns the cursor position when a drag at the edge should be reported.
+    private (int x, int y)? OnRawMouseMoveLocked(int dx, int dy)
     {
         if (!OnPhone)
         {
-            if (!PhoneReady || _phone is null) return;
+            if (!PhoneReady || _phone is null) return null;
             bool pushing = EdgeGeometry.IsPushingOut(_cfg.Edge, _segment, _cursorX, _cursorY, dx, dy);
-            if (_enter.Sample(pushing, _clock.NowMs)) EnterPhone();
-            return;
+            bool held = _pcButtons != HidMouseButtons.None;
+            if (_enter.Sample(pushing && !held, _clock.NowMs)) EnterPhone();
+            if (_dragAtEdge.Sample(pushing && held, _clock.NowMs) && !_dragAtEdgeRaised)
+            {
+                _dragAtEdgeRaised = true;
+                return (_cursorX, _cursorY);
+            }
+            return null;
         }
 
         var (adx, ady) = _phone!.Move(dx, dy);
@@ -119,13 +138,14 @@ public sealed class InputRouter
         if (_exit.Sample(back, _clock.NowMs))
         {
             ReturnToPcCore(sendReleases: true);
-            return;
+            return null;
         }
         if (adx != 0 || ady != 0)
         {
             foreach (var (cx, cy) in MoveChunker.Chunk(adx, ady))
                 _sink.SendMouse(MouseReport.Encode(_buttons, cx, cy, 0, 0));
         }
+        return null;
     }
 
     public void OnRawMouseButton(HidMouseButtons button, bool down)
@@ -137,7 +157,16 @@ public sealed class InputRouter
     // Caller holds _lock.
     private void OnRawMouseButtonLocked(HidMouseButtons button, bool down)
     {
-        if (!OnPhone) return;
+        if (!OnPhone)
+        {
+            _pcButtons = down ? _pcButtons | button : _pcButtons & ~button;
+            if (_pcButtons == HidMouseButtons.None)
+            {
+                _dragAtEdgeRaised = false;
+                _dragAtEdge.Reset();
+            }
+            return;
+        }
         if (button == HidMouseButtons.Right && _cfg.RightClickIsBack)
         {
             // Android treats a secondary mouse button as a context click, not Back, so the server injects KEYCODE_BACK instead.

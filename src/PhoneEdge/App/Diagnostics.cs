@@ -40,7 +40,7 @@ public static class Diagnostics
             var info = await settings.GetDisplayInfoAsync(ct);
             Step("display info", true, $"{info.Width}x{info.Height} rotation {info.Rotation}");
 
-            var conn = await ServerBootstrap.StartAsync(adb, jar, log, ct);
+            var conn = await ServerBootstrap.StartAsync(adb, jar, clipboardAutosync: false, log, ct);
             Step("server bootstrap", true, $"device '{conn.DeviceName}' port {conn.LocalPort}");
             channel = new ControlChannel(conn, log);
             channel.Start();

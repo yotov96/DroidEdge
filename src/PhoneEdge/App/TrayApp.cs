@@ -17,6 +17,11 @@ public sealed class TrayApp : ApplicationContext
     private RawInputWindow _raw = null!;
     private readonly SwitchableSink _sink = new();
     private InputRouter _router = null!;
+    private IntRect _monitor;
+    private readonly PhoneDesktop _desktop;
+    private readonly ClipboardSync _clipboard;
+    private DropZoneWindow _dropZone = null!;
+    private volatile PhoneConnection? _phone;
     private PhoneSession? _session;
     private SessionState _lastState = SessionState.Stopped;
     private bool _wasReady;
@@ -27,8 +32,12 @@ public sealed class TrayApp : ApplicationContext
     {
         _cfg = cfg;
         _log = log;
+        _desktop = new PhoneDesktop(cfg.ScrcpyDir, log);
+        _clipboard = new ClipboardSync(log);
 
         _tray = new TrayIcon(
+            onOpenDesktop: OpenDesktopFromTray,
+            onSendFiles: PickAndSendFiles,
             onReturnMouse: () => _router!.ReturnToPc(),
             onDiagnostics: () => _ = RunDiagnosticsAsync(),
             onOpenLog: () => OpenPath(Path.Combine(Program.BaseDir, "phoneedge.log")),
@@ -40,7 +49,7 @@ public sealed class TrayApp : ApplicationContext
         try
         {
             var monitors = MonitorLayout.GetMonitors();
-            var monitor = MonitorLayout.Select(monitors, cfg.Monitor);
+            var monitor = _monitor = MonitorLayout.Select(monitors, cfg.Monitor);
             var others = monitors.Where(m => m != monitor);
             var segment = MonitorLayout.EdgeSegment(cfg.Edge, monitor, others);
             if (segment is null)
@@ -57,7 +66,12 @@ public sealed class TrayApp : ApplicationContext
             {
                 if (onPhone) _tray.SetStatus("On phone", TrayColor.Blue);
                 else _tray.SetStatus(_lastStatus, _lastState == SessionState.Ready ? TrayColor.Green : TrayColor.Grey);
+                if (onPhone && _cfg.SyncClipboard && _phone is { } phone) _clipboard.OnEnteredPhone(phone.Channel);
             });
+
+            _dropZone = new DropZoneWindow();
+            _dropZone.FilesDropped += SendFiles;
+            _router.DragAtEdge += (x, y) => Ui(() => ShowDropZone(x, y));
 
             _raw = new RawInputWindow(log);
             _raw.MouseMoved += (dx, dy) => _router.OnRawMouseMove(dx, dy);
@@ -84,9 +98,66 @@ public sealed class TrayApp : ApplicationContext
         {
             _hooks?.Dispose();
             _raw?.Dispose();
+            _dropZone?.Dispose();
             _tray.Dispose();
             throw;
         }
+    }
+
+    // Desktop settings are re-read every time the window opens, so editing phoneedge.json needs no restart.
+    private AppConfig LoadFreshConfig() => ConfigLoader.Load(Program.ConfigPath, w => _log.Warning("{Warning}", w));
+
+    private void OpenDesktopFromTray()
+    {
+        if (_phone is { } phone) _desktop.Open(phone.Serial, LoadFreshConfig(), bringToFront: true);
+        else _tray.Balloon("PhoneEdge", "The phone is not connected", ToolTipIcon.Warning);
+    }
+
+    private void ShowDropZone(int cursorX, int cursorY)
+    {
+        if (_phone is null) return;
+        var size = DropZoneWindow.ZoneSize(_dropZone.DeviceDpi / 96f);
+        var b = EdgeGeometry.DropZoneBounds(_cfg.Edge, _monitor, cursorX, cursorY, size.Width, size.Height);
+        _dropZone.ShowAt(new Rectangle(b.Left, b.Top, b.Width, b.Height));
+    }
+
+    private void PickAndSendFiles()
+    {
+        if (_phone is null)
+        {
+            _tray.Balloon("PhoneEdge", "The phone is not connected", ToolTipIcon.Warning);
+            return;
+        }
+        using var dialog = new OpenFileDialog { Multiselect = true, Title = "Send files to the phone's Download folder" };
+        if (dialog.ShowDialog() == DialogResult.OK) SendFiles(dialog.FileNames);
+    }
+
+    private void SendFiles(string[] paths)
+    {
+        var phone = _phone;
+        if (phone is null)
+        {
+            _tray.Balloon("PhoneEdge", "The phone is not connected", ToolTipIcon.Warning);
+            return;
+        }
+        _tray.Balloon("PhoneEdge", $"Sending {paths.Length} item(s) to the phone…", ToolTipIcon.Info);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var r = await FileSender.SendAsync(phone, paths, _log, CancellationToken.None);
+                Ui(() =>
+                {
+                    if (r.Failed.Count == 0) _tray.Balloon("PhoneEdge", $"Sent {r.Sent} item(s) to Download", ToolTipIcon.Info);
+                    else _tray.Balloon("PhoneEdge", $"Sent {r.Sent}, failed {r.Failed.Count}: {string.Join(", ", r.Failed)}", ToolTipIcon.Warning);
+                });
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Sending files failed");
+                Ui(() => _tray.Balloon("PhoneEdge", $"Sending files failed: {ex.Message}", ToolTipIcon.Error));
+            }
+        });
     }
 
     private string _lastStatus = "Starting";
@@ -95,9 +166,20 @@ public sealed class TrayApp : ApplicationContext
     {
         var s = new PhoneSession(_cfg, _log);
         s.StateChanged += OnSessionState;
-        s.Connected += (sink, info) => { _sink.Target = sink; _router.SetPhoneReady(info.Width, info.Height); };
+        s.Connected += (phone, info) =>
+        {
+            _phone = phone;
+            _sink.Target = phone.Channel;
+            _router.SetPhoneReady(info.Width, info.Height);
+            if (_cfg.SyncClipboard) phone.Channel.ClipboardChanged += text => Ui(() => _clipboard.OnPhoneClipboard(text));
+            Ui(() =>
+            {
+                var fresh = LoadFreshConfig();
+                if (fresh.OpenDesktopOnConnect) _desktop.Open(phone.Serial, fresh, bringToFront: false);
+            });
+        };
         s.DisplayChanged += info => _router.UpdatePhoneBounds(info.Width, info.Height);
-        s.Disconnected += () => { _router.SetPhoneUnavailable(); _sink.Target = null; };
+        s.Disconnected += () => { _router.SetPhoneUnavailable(); _sink.Target = null; _phone = null; };
         _session = s;
         s.Start();
     }
@@ -164,6 +246,10 @@ public sealed class TrayApp : ApplicationContext
                   "forwardKeyboard": true,
                   "rightClickIsBack": true,
                   "middleClickIsDone": true,
+                  "syncClipboard": true,
+                  "openDesktopOnConnect": true,
+                  "desktopDisplay": "1920x1080",
+                  "desktopFlex": true,
                   "panicHotkey": ["LControl", "RControl"],
                   "logLevel": "Info"
                 }
@@ -208,8 +294,10 @@ public sealed class TrayApp : ApplicationContext
             catch (Exception ex) { _log.Warning(ex, "Session stop failed"); }
         }
         _session?.Dispose();
+        _desktop.Dispose();
         _hooks.Dispose();
         _raw.Dispose();
+        _dropZone.Dispose();
         _tray.Dispose();
         ExitThread();
     }
