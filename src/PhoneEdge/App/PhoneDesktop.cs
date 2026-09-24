@@ -39,6 +39,9 @@ public sealed class PhoneDesktop : IDisposable
         // Using the virtual display does not count as activity for the phone's own screen, so without --stay-awake
         // the phone sleeps and locks after its screen timeout. scrcpy restores the setting when the window closes.
         args.Add("--stay-awake");
+        // A HID keyboard follows the layout set on the phone for it. scrcpy's default mode maps letters with Android's
+        // US layout, and its text injection drops characters that layout cannot type (Cyrillic, for instance).
+        args.Add("--keyboard=uhid");
         // Clipboard is handled by our own connection; closing the window moves its apps to the phone screen instead of killing them.
         args.AddRange(["--no-audio", "--no-clipboard-autosync", "--no-vd-destroy-content", $"--window-title={WindowTitle}"]);
         return args;

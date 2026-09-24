@@ -11,7 +11,7 @@ public class PhoneDesktopTests
         var args = PhoneDesktop.BuildArguments("SER1", AppConfig.Default);
         Assert.Equal(new[]
         {
-            "-s", "SER1", "--new-display=1920x1080", "--flex-display", "--stay-awake", "--no-audio",
+            "-s", "SER1", "--new-display=1920x1080", "--flex-display", "--stay-awake", "--keyboard=uhid", "--no-audio",
             "--no-clipboard-autosync", "--no-vd-destroy-content", "--window-title=Phone desktop",
         }, args);
     }

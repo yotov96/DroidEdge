@@ -31,6 +31,8 @@ A second window (`scrcpy.exe`) shows a virtual display created on the phone, wit
 
 While the desktop window is open the phone is kept awake (scrcpy `--stay-awake`, restored when the window closes), and its own screen is dark except while the mouse is on it. **The phone stays unlocked the whole time the desktop is open**; the physical power button still locks it. Clicking or touching the dark screen does not light it: Android considers it on, so input goes to the app underneath. Cross the mouse over to light it.
 
+Typing follows the phone's keyboard layouts, not the PC's language: both the desktop window (scrcpy `--keyboard=uhid`) and PhoneEdge send key presses as a USB keyboard would. Set the layouts once in Settings → System → Keyboard → Physical keyboard, for **PhoneEdge Keyboard** (mouse on the phone screen) and **scrcpy** (desktop window), and switch language on the phone side. scrcpy's other keyboard modes type through Android's US layout and drop non-Latin characters such as Cyrillic.
+
 - `desktopDisplay`: initial size and density in scrcpy's syntax, e.g. `"1920x1080"`, `"1440x1800/240"`, `"/240"` (phone size, 240 dpi) or `""` (phone size and density). Higher dpi means bigger UI.
 - `desktopFlex` (default `true`): the virtual display keeps resizing to match the window, so it fits whatever size your window manager gives it.
 - Both are re-read each time the window opens; close it and reopen from the tray to apply changes.
