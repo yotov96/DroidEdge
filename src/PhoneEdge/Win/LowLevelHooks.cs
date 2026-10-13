@@ -22,6 +22,8 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
     private long _slowWarnings;
     private readonly HashSet<(uint scanCode, bool extended)> _unknownKeysLogged = new();
     private const uint LlkhfExtended = 0x01; // KBDLLHOOKSTRUCT.flags: E0-prefixed scan code
+    private readonly TildeKeyRemap _tildeRemap = new();
+    private volatile int _desktopProcessId;
 
     public LowLevelHooks(PanicHotkey panic, ILogger log)
     {
@@ -32,6 +34,12 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
     }
 
     public bool Swallow { get => _swallow; set => _swallow = value; }
+
+    /// <summary>
+    /// Process id of the phone desktop window's scrcpy.exe, or 0 while it is closed. While that window is active and the
+    /// mouse is on the PC, the tilde key releases its captured mouse (see <see cref="TildeKeyRemap"/>).
+    /// </summary>
+    public int DesktopProcessId { get => _desktopProcessId; set => _desktopProcessId = value; }
     public event Action<int, int>? CursorMoved;
     public event Action? PanicPressed;
     /// <summary>A non-injected key press/release as a HID usage. Raised in every mode; the router ignores it while on the PC.</summary>
@@ -112,6 +120,16 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
                 PanicPressed?.Invoke();
             }
             bool extended = (info.flags & LlkhfExtended) != 0;
+            if (info.scanCode == TildeKeyRemap.ScanCode && !extended)
+            {
+                TildeKeyAction action = _tildeRemap.OnKey((ushort)info.scanCode, extended, down, IsModifierHeld(), !_swallow && IsDesktopActive());
+                if (action != TildeKeyAction.PassThrough)
+                {
+                    if (action == TildeKeyAction.SwallowAndTapRightControl) TapRightControl();
+                    WarnIfSlow(t0, "keyboard");
+                    return 1;
+                }
+            }
             if (KeyDecoder.TryDecode((ushort)info.scanCode, extended, info.vkCode, out var usage))
             {
                 Key?.Invoke(usage, down);
@@ -124,6 +142,39 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
         IntPtr result = !injected && _swallow ? 1 : User32.CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
         WarnIfSlow(t0, "keyboard");
         return result;
+    }
+
+    private bool IsDesktopActive()
+    {
+        int processId = _desktopProcessId;
+        if (processId == 0) return false;
+        IntPtr window = User32.GetForegroundWindow();
+        if (window == IntPtr.Zero) return false;
+        User32.GetWindowThreadProcessId(window, out uint foregroundProcessId);
+        return foregroundProcessId == (uint)processId;
+    }
+
+    private static readonly int[] ModifierKeys = [User32.VK_SHIFT, User32.VK_CONTROL, User32.VK_MENU, User32.VK_LWIN, User32.VK_RWIN];
+
+    private static bool IsModifierHeld()
+    {
+        foreach (int vk in ModifierKeys)
+        {
+            if ((User32.GetAsyncKeyState(vk) & 0x8000) != 0) return true;
+        }
+        return false;
+    }
+
+    private void TapRightControl()
+    {
+        // The scan code goes in explicitly: SDL (scrcpy's window) tells Right Ctrl from Left Ctrl by scan code and E0 flag
+        User32.INPUT[] inputs =
+        [
+            new User32.INPUT { type = User32.INPUT_KEYBOARD, u = new User32.INPUTUNION { ki = new User32.KEYBDINPUT { wVk = User32.VK_RCONTROL, wScan = User32.SCAN_CONTROL, dwFlags = User32.KEYEVENTF_EXTENDEDKEY } } },
+            new User32.INPUT { type = User32.INPUT_KEYBOARD, u = new User32.INPUTUNION { ki = new User32.KEYBDINPUT { wVk = User32.VK_RCONTROL, wScan = User32.SCAN_CONTROL, dwFlags = User32.KEYEVENTF_EXTENDEDKEY | User32.KEYEVENTF_KEYUP } } },
+        ];
+        uint sent = User32.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<User32.INPUT>());
+        if (sent != inputs.Length) _log.Warning("Sending Right Ctrl for the tilde key failed: {Error}", Marshal.GetLastWin32Error());
     }
 
     private void WarnIfSlow(long t0, string which)

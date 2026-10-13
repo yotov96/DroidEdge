@@ -69,7 +69,11 @@ public sealed class TrayApp : ApplicationContext
                 if (onPhone && _cfg.SyncClipboard && _phone is { } phone) _clipboard.OnEnteredPhone(phone.Channel);
             });
 
-            _desktop.Closed += () => Ui(() => _router.SetDesktopOpen(_desktop.IsOpen));
+            _desktop.Closed += () => Ui(() =>
+            {
+                _router.SetDesktopOpen(_desktop.IsOpen);
+                _hooks.DesktopProcessId = _desktop.ProcessId;
+            });
 
             _dropZone = new DropZoneWindow();
             _dropZone.FilesDropped += SendFiles;
@@ -119,6 +123,7 @@ public sealed class TrayApp : ApplicationContext
     {
         _desktop.Open(phone.Serial, cfg, bringToFront);
         _router.SetDesktopOpen(_desktop.IsOpen);
+        _hooks.DesktopProcessId = _desktop.ProcessId;
     }
 
     private void ShowDropZone(int cursorX, int cursorY)

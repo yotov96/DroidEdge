@@ -1,9 +1,9 @@
-# Builds scrcpy's server with android17-desktop.patch into .\dist\scrcpy-server-desktop.
+# Builds scrcpy's server with phoneedge.patch into .\dist\scrcpy-server-desktop.
 # Same steps as scrcpy's server/build_without_gradle.sh, which does not run on Windows (d8 is a .bat, ':' classpath).
 # Needs a scrcpy v4.1 checkout with the patch applied, a JDK 17 and the Android SDK packages
 # platforms;android-36 and build-tools;36.0.0. To prepare the checkout:
 #   git clone --branch v4.1 https://github.com/Genymobile/scrcpy.git C:\tools\scrcpy
-#   git -C C:\tools\scrcpy am <this folder>\android17-desktop.patch
+#   git -C C:\tools\scrcpy am <this folder>\phoneedge.patch
 param(
     [string]$ScrcpySource = 'C:\tools\scrcpy',
     [string]$Jdk = (Get-ChildItem C:\tools -Directory -Filter 'jdk-17*' | Select-Object -First 1).FullName,
