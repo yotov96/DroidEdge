@@ -2,8 +2,8 @@ bin/
 obj/
 *.user
 .vs/
-phoneedge.log*
-phoneedge.json
-phoneedge-diag.txt
+droidedge.log*
+droidedge.json
+droidedge-diag.txt
 dist/
 .superpowers/

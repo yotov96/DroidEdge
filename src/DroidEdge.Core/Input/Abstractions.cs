@@ -1,0 +1,34 @@
+namespace DroidEdge.Core.Input;
+
+/// <summary>Receives HID reports (unframed) and control actions to deliver to the phone.</summary>
+public interface IReportSink
+{
+    bool SendMouse(byte[] report);
+    bool SendKeyboard(byte[] report);
+    /// <summary>Android Back key press (true) or release (false), injected by the server rather than sent as HID.</summary>
+    bool SendBack(bool down);
+    /// <summary>Turns the phone's own display panel on or off without locking or sleeping the phone.</summary>
+    bool SendDisplayPower(bool on);
+}
+
+public interface ICursor
+{
+    (int x, int y) GetPosition();
+    void SetPosition(int x, int y);
+}
+
+/// <summary>Controls whether the low-level hooks swallow input.</summary>
+public interface IInputGate
+{
+    bool Swallow { get; set; }
+}
+
+public interface IClock
+{
+    long NowMs { get; }
+}
+
+public sealed class SystemClock : IClock
+{
+    public long NowMs => Environment.TickCount64;
+}

@@ -1,6 +1,6 @@
-# PhoneEdge manual end-to-end checklist
+# DroidEdge manual end-to-end checklist
 
-Setup: phone plugged in, unlocked, USB debugging authorized. Start `PhoneEdge.exe`. Tray icon turns green and a balloon says the phone connected.
+Setup: phone plugged in, unlocked, USB debugging authorized. Start `DroidEdge.exe`. Tray icon turns green and a balloon says the phone connected.
 
 1. **Cross** — push the mouse against the left edge of the primary monitor and keep pushing for ~1 s. Expected: Windows cursor stops at the edge, a cursor appears at the right edge of the phone at the matching height, tray icon turns blue.
 2. **Move/click** — move around, left-click an app icon, long-press. Expected: 1:1 feel, no drift at edges.
@@ -14,4 +14,4 @@ Setup: phone plugged in, unlocked, USB debugging authorized. Start `PhoneEdge.ex
 10. **Rotation** — rotate the phone to landscape, wait 3 s, cross. Expected: cursor lands on the correct (right, now longer) edge and clamps at the new bounds.
 11. **Diagnostics** — tray → Run diagnostics. Expected: dialog starts with PASS; the phone cursor tours the corners; the session resumes afterwards.
 12. **Exit** — tray → Exit, then `adb shell settings get system pointer_speed` and `... mouse_pointer_acceleration_enabled`. Expected: original values (or `null`) restored; `adb shell ps -A | grep scrcpy` shows nothing.
-13. **Second instance** — start PhoneEdge.exe again. Expected: message "already running".
+13. **Second instance** — start DroidEdge.exe again. Expected: message "already running".
