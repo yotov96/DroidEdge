@@ -10,7 +10,7 @@ public class TildeKeyRemapTests
     public void Plain_press_in_the_desktop_window_taps_right_control_and_swallows_the_key()
     {
         TildeKeyRemap r = new();
-        Assert.Equal(TildeKeyAction.SwallowAndTapRightControl, r.OnKey(Tilde, false, down: true, modifierHeld: false, desktopActive: true));
+        Assert.Equal(TildeKeyAction.SwallowAndTapShortcutKey, r.OnKey(Tilde, false, down: true, modifierHeld: false, desktopActive: true));
         Assert.Equal(TildeKeyAction.Swallow, r.OnKey(Tilde, false, down: false, modifierHeld: false, desktopActive: true));
     }
 
@@ -18,11 +18,11 @@ public class TildeKeyRemapTests
     public void Auto_repeat_while_held_taps_only_once()
     {
         TildeKeyRemap r = new();
-        Assert.Equal(TildeKeyAction.SwallowAndTapRightControl, r.OnKey(Tilde, false, true, false, true));
+        Assert.Equal(TildeKeyAction.SwallowAndTapShortcutKey, r.OnKey(Tilde, false, true, false, true));
         Assert.Equal(TildeKeyAction.Swallow, r.OnKey(Tilde, false, true, false, true));
         Assert.Equal(TildeKeyAction.Swallow, r.OnKey(Tilde, false, true, false, true));
         Assert.Equal(TildeKeyAction.Swallow, r.OnKey(Tilde, false, false, false, true));
-        Assert.Equal(TildeKeyAction.SwallowAndTapRightControl, r.OnKey(Tilde, false, true, false, true));
+        Assert.Equal(TildeKeyAction.SwallowAndTapShortcutKey, r.OnKey(Tilde, false, true, false, true));
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class TildeKeyRemapTests
     public void Release_follows_the_press_when_the_active_window_changes_in_between()
     {
         TildeKeyRemap r = new();
-        Assert.Equal(TildeKeyAction.SwallowAndTapRightControl, r.OnKey(Tilde, false, true, false, true));
+        Assert.Equal(TildeKeyAction.SwallowAndTapShortcutKey, r.OnKey(Tilde, false, true, false, true));
         Assert.Equal(TildeKeyAction.Swallow, r.OnKey(Tilde, false, false, false, desktopActive: false));
 
         Assert.Equal(TildeKeyAction.PassThrough, r.OnKey(Tilde, false, true, false, desktopActive: false));

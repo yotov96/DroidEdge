@@ -288,7 +288,7 @@ public class InputRouterTests
     {
         var (r, s, _, _, k) = Make();
         r.SetPhoneReady(W, H, 1.0);
-        r.SetDesktopOpen(true);
+        r.SetPhoneKeptAwake(true);
         Assert.Equal(new[] { false }, s.DisplayPower);
         PushIn(r, k);
         Assert.Equal(new[] { false, true }, s.DisplayPower);
@@ -315,7 +315,7 @@ public class InputRouterTests
         var (r, s, _, _, k) = Make();
         r.SetPhoneReady(W, H, 1.0);
         PushIn(r, k);
-        r.SetDesktopOpen(true);
+        r.SetPhoneKeptAwake(true);
         Assert.Empty(s.DisplayPower);
         r.ReturnToPc(); // panic hotkey / tray path
         Assert.Equal(new[] { false }, s.DisplayPower);
@@ -327,7 +327,7 @@ public class InputRouterTests
         // The old server's cleanup turns the screen back on when the connection drops.
         var (r, s, _, _, _) = Make();
         r.SetPhoneReady(W, H, 1.0);
-        r.SetDesktopOpen(true);
+        r.SetPhoneKeptAwake(true);
         r.SetPhoneUnavailable();
         r.SetPhoneReady(W, H, 1.0);
         Assert.Equal(new[] { false, false }, s.DisplayPower);
@@ -338,8 +338,8 @@ public class InputRouterTests
     {
         var (r, s, _, _, k) = Make();
         r.SetPhoneReady(W, H, 1.0);
-        r.SetDesktopOpen(true);
-        r.SetDesktopOpen(false);
+        r.SetPhoneKeptAwake(true);
+        r.SetPhoneKeptAwake(false);
         PushIn(r, k);
         PushOut(r, k);
         Assert.False(r.OnPhone);

@@ -21,11 +21,25 @@ public static class ConfigLoader
         public bool? OpenDesktopOnConnect { get; set; }
         public string? DesktopDisplay { get; set; }
         public bool? DesktopFlex { get; set; }
+        public string? DesktopKeyboard { get; set; }
+        public string? DesktopMouse { get; set; }
+        public string? DesktopShortcutMod { get; set; }
+        public bool? DesktopTildeReleasesMouse { get; set; }
+        public bool? DesktopKeepAwake { get; set; }
+        public bool? DesktopKeepAppsOnClose { get; set; }
+        public bool? DesktopPatchedServer { get; set; }
+        public bool? DesktopPatchedClient { get; set; }
         public string[]? PanicHotkey { get; set; }
         public string? LogLevel { get; set; }
     }
 
     private static readonly System.Text.RegularExpressions.Regex DesktopDisplayPattern = new(@"^(\d{2,5}x\d{2,5})?(/\d{2,4})?$");
+
+    // scrcpy's --keyboard and --mouse modes that make sense for the desktop window ("aoa" needs scrcpy's OTG mode)
+    private static readonly string[] DesktopInputModes = ["uhid", "sdk", "disabled"];
+
+    /// <summary>Keys scrcpy accepts in --shortcut-mod.</summary>
+    public static readonly string[] ShortcutModKeys = ["lctrl", "rctrl", "lalt", "ralt", "lsuper", "rsuper"];
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -83,6 +97,18 @@ public static class ConfigLoader
             else warn($"Config 'desktopDisplay' must look like 1920x1080, 1920x1080/240, /240 or be empty, got '{dto.DesktopDisplay}'; using {d.DesktopDisplay}");
         }
 
+        string desktopKeyboard = OneOf(dto.DesktopKeyboard, DesktopInputModes, d.DesktopKeyboard, "desktopKeyboard", warn);
+        string desktopMouse = OneOf(dto.DesktopMouse, DesktopInputModes, d.DesktopMouse, "desktopMouse", warn);
+
+        string shortcutMod = d.DesktopShortcutMod;
+        if (dto.DesktopShortcutMod is not null)
+        {
+            string[] keys = dto.DesktopShortcutMod.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(k => k.ToLowerInvariant()).ToArray();
+            if (keys.Length > 0 && keys.All(ShortcutModKeys.Contains)) shortcutMod = string.Join(',', keys);
+            else warn($"Config 'desktopShortcutMod' must be a comma-separated list of {string.Join(", ", ShortcutModKeys)}, got '{dto.DesktopShortcutMod}'; using {d.DesktopShortcutMod}");
+        }
+
         string[] hotkey = d.PanicHotkey;
         if (dto.PanicHotkey is not null)
         {
@@ -106,9 +132,26 @@ public static class ConfigLoader
             OpenDesktopOnConnect = dto.OpenDesktopOnConnect ?? d.OpenDesktopOnConnect,
             DesktopDisplay = desktopDisplay,
             DesktopFlex = dto.DesktopFlex ?? d.DesktopFlex,
+            DesktopKeyboard = desktopKeyboard,
+            DesktopMouse = desktopMouse,
+            DesktopShortcutMod = shortcutMod,
+            DesktopTildeReleasesMouse = dto.DesktopTildeReleasesMouse ?? d.DesktopTildeReleasesMouse,
+            DesktopKeepAwake = dto.DesktopKeepAwake ?? d.DesktopKeepAwake,
+            DesktopKeepAppsOnClose = dto.DesktopKeepAppsOnClose ?? d.DesktopKeepAppsOnClose,
+            DesktopPatchedServer = dto.DesktopPatchedServer ?? d.DesktopPatchedServer,
+            DesktopPatchedClient = dto.DesktopPatchedClient ?? d.DesktopPatchedClient,
             PanicHotkey = hotkey,
             LogLevel = string.IsNullOrWhiteSpace(dto.LogLevel) ? d.LogLevel : dto.LogLevel,
         };
+    }
+
+    private static string OneOf(string? value, string[] allowed, string fallback, string name, Action<string> warn)
+    {
+        if (value is null) return fallback;
+        string normalized = value.Trim().ToLowerInvariant();
+        if (allowed.Contains(normalized)) return normalized;
+        warn($"Config '{name}' must be one of {string.Join(", ", allowed)}, got '{value}'; using {fallback}");
+        return fallback;
     }
 
     private static int PositiveOrDefault(int? value, int fallback, string name, Action<string> warn)

@@ -25,6 +25,7 @@ public sealed class PhoneDesktop : IDisposable
     private readonly string _adbExe;
     private readonly ILogger _log;
     private Process? _process;
+    private AppConfig? _openedWith; // the settings of the running window; the config file may have changed since
 
     public PhoneDesktop(string scrcpyDir, ILogger log)
     {
@@ -38,25 +39,37 @@ public sealed class PhoneDesktop : IDisposable
     /// <summary>Process id of the window's scrcpy.exe, or 0 when it is not open.</summary>
     public int ProcessId => IsOpen ? _process!.Id : 0;
 
+    /// <summary>The window is open and keeps the phone awake (desktopKeepAwake).</summary>
+    public bool KeepsPhoneAwake => IsOpen && _openedWith!.DesktopKeepAwake;
+
+    /// <summary>
+    /// The --shortcut-mod key that the tilde key should tap to release the window's captured mouse, or null when the
+    /// window is closed, does not capture the mouse, or desktopTildeReleasesMouse is off.
+    /// </summary>
+    public string? TildeReleaseKey =>
+        IsOpen && _openedWith!.DesktopTildeReleasesMouse && _openedWith.DesktopMouse == "uhid"
+            ? _openedWith.DesktopShortcutMod.Split(',')[0]
+            : null;
+
     /// <summary>The scrcpy process exited (window closed, phone unplugged). Raised on a thread-pool thread.</summary>
     public event Action? Closed;
 
     public static List<string> BuildArguments(string serial, AppConfig cfg)
     {
-        var args = new List<string> { "-s", serial, cfg.DesktopDisplay.Length == 0 ? "--new-display" : $"--new-display={cfg.DesktopDisplay}" };
+        List<string> args = ["-s", serial, cfg.DesktopDisplay.Length == 0 ? "--new-display" : $"--new-display={cfg.DesktopDisplay}"];
         if (cfg.DesktopFlex) args.Add("--flex-display");
         // Using the virtual display does not count as activity for the phone's own screen, so without --stay-awake
         // the phone sleeps and locks after its screen timeout. scrcpy restores the setting when the window closes.
-        args.Add("--stay-awake");
-        // A HID keyboard follows the layout set on the phone for it. scrcpy's default mode maps letters with Android's
+        if (cfg.DesktopKeepAwake) args.Add("--stay-awake");
+        // uhid keyboard: follows the layout set on the phone for it. scrcpy's default mode maps letters with Android's
         // US layout, and its text injection drops characters that layout cannot type (Cyrillic, for instance).
-        args.Add("--keyboard=uhid");
-        // A HID mouse sends relative movement and is captured by the window, so apps that grab the pointer (Moonlight)
-        // get a single pointer instead of an absolute one trailing the Windows cursor. Right Ctrl releases it, which
-        // leaves Alt and Super free for the apps; the tilde key is mapped to Right Ctrl by LowLevelHooks.
-        args.AddRange(["--mouse=uhid", "--shortcut-mod=rctrl"]);
-        // Clipboard is handled by our own connection; closing the window moves its apps to the phone screen instead of killing them.
-        args.AddRange(["--no-audio", "--no-clipboard-autosync", "--no-vd-destroy-content", $"--window-title={WindowTitle}"]);
+        // uhid mouse: relative movement, captured by the window, so apps that grab the pointer (Moonlight) get a single
+        // pointer instead of an absolute one trailing the Windows cursor.
+        args.AddRange([$"--keyboard={cfg.DesktopKeyboard}", $"--mouse={cfg.DesktopMouse}", $"--shortcut-mod={cfg.DesktopShortcutMod}"]);
+        // Clipboard is handled by our own connection
+        args.AddRange(["--no-audio", "--no-clipboard-autosync"]);
+        if (cfg.DesktopKeepAppsOnClose) args.Add("--no-vd-destroy-content");
+        args.Add($"--window-title={WindowTitle}");
         return args;
     }
 
@@ -70,7 +83,7 @@ public sealed class PhoneDesktop : IDisposable
         }
         _process?.Dispose();
 
-        bool patchedClient = File.Exists(DesktopClientPath);
+        bool patchedClient = cfg.DesktopPatchedClient && File.Exists(DesktopClientPath);
         ProcessStartInfo psi = new(patchedClient ? DesktopClientPath : _scrcpyExe)
         {
             UseShellExecute = false,
@@ -79,7 +92,7 @@ public sealed class PhoneDesktop : IDisposable
             RedirectStandardError = true,
         };
         foreach (var a in BuildArguments(serial, cfg)) psi.ArgumentList.Add(a);
-        bool patchedServer = File.Exists(DesktopServerPath);
+        bool patchedServer = cfg.DesktopPatchedServer && File.Exists(DesktopServerPath);
         if (patchedServer) psi.Environment["SCRCPY_SERVER_PATH"] = DesktopServerPath;
         // The patched client has no adb.exe next to it; use the installed one, so only one adb server version runs
         if (patchedClient) psi.Environment["ADB"] = _adbExe;
@@ -96,6 +109,7 @@ public sealed class PhoneDesktop : IDisposable
         p.BeginOutputReadLine();
         p.BeginErrorReadLine();
         _process = p;
+        _openedWith = cfg;
         _log.Information("Phone desktop opened: {Client} {Args} ({Server})", psi.FileName, string.Join(' ', psi.ArgumentList),
             patchedServer ? $"server {DesktopServerPath}" : "stock server");
     }

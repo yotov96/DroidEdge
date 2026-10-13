@@ -24,6 +24,7 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
     private const uint LlkhfExtended = 0x01; // KBDLLHOOKSTRUCT.flags: E0-prefixed scan code
     private readonly TildeKeyRemap _tildeRemap = new();
     private volatile int _desktopProcessId;
+    private volatile ScrcpyShortcutKey? _desktopReleaseKey;
 
     public LowLevelHooks(PanicHotkey panic, ILogger log)
     {
@@ -35,11 +36,14 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
 
     public bool Swallow { get => _swallow; set => _swallow = value; }
 
-    /// <summary>
-    /// Process id of the phone desktop window's scrcpy.exe, or 0 while it is closed. While that window is active and the
-    /// mouse is on the PC, the tilde key releases its captured mouse (see <see cref="TildeKeyRemap"/>).
-    /// </summary>
+    /// <summary>Process id of the phone desktop window's scrcpy.exe, or 0 while it is closed.</summary>
     public int DesktopProcessId { get => _desktopProcessId; set => _desktopProcessId = value; }
+
+    /// <summary>
+    /// The window's scrcpy shortcut key, tapped for the tilde key while the window is active and the mouse is on the PC,
+    /// so that the tilde key releases its captured mouse (see <see cref="TildeKeyRemap"/>); null leaves the tilde key alone.
+    /// </summary>
+    public ScrcpyShortcutKey? DesktopReleaseKey { get => _desktopReleaseKey; set => _desktopReleaseKey = value; }
     public event Action<int, int>? CursorMoved;
     public event Action? PanicPressed;
     /// <summary>A non-injected key press/release as a HID usage. Raised in every mode; the router ignores it while on the PC.</summary>
@@ -122,10 +126,12 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
             bool extended = (info.flags & LlkhfExtended) != 0;
             if (info.scanCode == TildeKeyRemap.ScanCode && !extended)
             {
-                TildeKeyAction action = _tildeRemap.OnKey((ushort)info.scanCode, extended, down, IsModifierHeld(), !_swallow && IsDesktopActive());
+                ScrcpyShortcutKey? releaseKey = _desktopReleaseKey;
+                bool desktopActive = releaseKey is not null && !_swallow && IsDesktopActive();
+                TildeKeyAction action = _tildeRemap.OnKey((ushort)info.scanCode, extended, down, IsModifierHeld(), desktopActive);
                 if (action != TildeKeyAction.PassThrough)
                 {
-                    if (action == TildeKeyAction.SwallowAndTapRightControl) TapRightControl();
+                    if (action == TildeKeyAction.SwallowAndTapShortcutKey) TapKey(releaseKey!);
                     WarnIfSlow(t0, "keyboard");
                     return 1;
                 }
@@ -165,16 +171,17 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
         return false;
     }
 
-    private void TapRightControl()
+    private void TapKey(ScrcpyShortcutKey key)
     {
-        // The scan code goes in explicitly: SDL (scrcpy's window) tells Right Ctrl from Left Ctrl by scan code and E0 flag
+        // The scan code goes in explicitly: SDL (scrcpy's window) tells right-hand keys from left-hand ones by scan code and E0 flag
+        uint flags = key.Extended ? User32.KEYEVENTF_EXTENDEDKEY : 0;
         User32.INPUT[] inputs =
         [
-            new User32.INPUT { type = User32.INPUT_KEYBOARD, u = new User32.INPUTUNION { ki = new User32.KEYBDINPUT { wVk = User32.VK_RCONTROL, wScan = User32.SCAN_CONTROL, dwFlags = User32.KEYEVENTF_EXTENDEDKEY } } },
-            new User32.INPUT { type = User32.INPUT_KEYBOARD, u = new User32.INPUTUNION { ki = new User32.KEYBDINPUT { wVk = User32.VK_RCONTROL, wScan = User32.SCAN_CONTROL, dwFlags = User32.KEYEVENTF_EXTENDEDKEY | User32.KEYEVENTF_KEYUP } } },
+            new User32.INPUT { type = User32.INPUT_KEYBOARD, u = new User32.INPUTUNION { ki = new User32.KEYBDINPUT { wVk = key.VirtualKey, wScan = key.ScanCode, dwFlags = flags } } },
+            new User32.INPUT { type = User32.INPUT_KEYBOARD, u = new User32.INPUTUNION { ki = new User32.KEYBDINPUT { wVk = key.VirtualKey, wScan = key.ScanCode, dwFlags = flags | User32.KEYEVENTF_KEYUP } } },
         ];
         uint sent = User32.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<User32.INPUT>());
-        if (sent != inputs.Length) _log.Warning("Sending Right Ctrl for the tilde key failed: {Error}", Marshal.GetLastWin32Error());
+        if (sent != inputs.Length) _log.Warning("Sending the shortcut key for the tilde key failed: {Error}", Marshal.GetLastWin32Error());
     }
 
     private void WarnIfSlow(long t0, string which)

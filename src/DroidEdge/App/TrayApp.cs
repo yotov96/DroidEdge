@@ -69,11 +69,7 @@ public sealed class TrayApp : ApplicationContext
                 if (onPhone && _cfg.SyncClipboard && _phone is { } phone) _clipboard.OnEnteredPhone(phone.Channel);
             });
 
-            _desktop.Closed += () => Ui(() =>
-            {
-                _router.SetDesktopOpen(_desktop.IsOpen);
-                _hooks.DesktopProcessId = _desktop.ProcessId;
-            });
+            _desktop.Closed += () => Ui(SyncDesktopState);
 
             _dropZone = new DropZoneWindow();
             _dropZone.FilesDropped += SendFiles;
@@ -122,8 +118,15 @@ public sealed class TrayApp : ApplicationContext
     private void OpenDesktop(PhoneConnection phone, AppConfig cfg, bool bringToFront)
     {
         _desktop.Open(phone.Serial, cfg, bringToFront);
-        _router.SetDesktopOpen(_desktop.IsOpen);
+        SyncDesktopState();
+    }
+
+    // Passes the state of the running desktop window (open or not, and the settings it opened with) to the router and the hooks
+    private void SyncDesktopState()
+    {
+        _router.SetPhoneKeptAwake(_desktop.KeepsPhoneAwake);
         _hooks.DesktopProcessId = _desktop.ProcessId;
+        _hooks.DesktopReleaseKey = _desktop.TildeReleaseKey is { } name ? ScrcpyShortcutKey.FromName(name) : null;
     }
 
     private void ShowDropZone(int cursorX, int cursorY)

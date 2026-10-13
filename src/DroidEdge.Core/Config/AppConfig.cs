@@ -25,6 +25,22 @@ public sealed record AppConfig
     public string DesktopDisplay { get; init; } = "1920x1080";
     /// <summary>Resize the virtual display to follow the window (scrcpy --flex-display).</summary>
     public bool DesktopFlex { get; init; } = true;
+    /// <summary>scrcpy --keyboard mode for the desktop window: "uhid" (follows the phone's layouts), "sdk" or "disabled".</summary>
+    public string DesktopKeyboard { get; init; } = "uhid";
+    /// <summary>scrcpy --mouse mode for the desktop window: "uhid" (captured, relative), "sdk" (plain window) or "disabled".</summary>
+    public string DesktopMouse { get; init; } = "uhid";
+    /// <summary>scrcpy --shortcut-mod for the desktop window: comma-separated lctrl, rctrl, lalt, ralt, lsuper, rsuper.</summary>
+    public string DesktopShortcutMod { get; init; } = "rctrl";
+    /// <summary>The tilde key taps the first shortcut key, which releases the captured mouse (with DesktopMouse "uhid").</summary>
+    public bool DesktopTildeReleasesMouse { get; init; } = true;
+    /// <summary>Keep the phone awake while the window is open (scrcpy --stay-awake), its own screen dark unless the mouse is on it.</summary>
+    public bool DesktopKeepAwake { get; init; } = true;
+    /// <summary>Closing the window moves its apps to the phone screen instead of closing them (scrcpy --no-vd-destroy-content).</summary>
+    public bool DesktopKeepAppsOnClose { get; init; } = true;
+    /// <summary>Use the patched scrcpy server for the window when it has been built (desktop windows on Android 17).</summary>
+    public bool DesktopPatchedServer { get; init; } = true;
+    /// <summary>Use the patched scrcpy client for the window when it has been built (keyboard grab while the mouse is captured).</summary>
+    public bool DesktopPatchedClient { get; init; } = true;
     public string[] PanicHotkey { get; init; } = ["LControl", "RControl"];
     public string LogLevel { get; init; } = "Info";
 
@@ -37,6 +53,10 @@ public sealed record AppConfig
         Sensitivity == other.Sensitivity && ForwardKeyboard == other.ForwardKeyboard && RightClickIsBack == other.RightClickIsBack &&
         MiddleClickIsDone == other.MiddleClickIsDone && SyncClipboard == other.SyncClipboard &&
         OpenDesktopOnConnect == other.OpenDesktopOnConnect && DesktopDisplay == other.DesktopDisplay && DesktopFlex == other.DesktopFlex &&
+        DesktopKeyboard == other.DesktopKeyboard && DesktopMouse == other.DesktopMouse && DesktopShortcutMod == other.DesktopShortcutMod &&
+        DesktopTildeReleasesMouse == other.DesktopTildeReleasesMouse && DesktopKeepAwake == other.DesktopKeepAwake &&
+        DesktopKeepAppsOnClose == other.DesktopKeepAppsOnClose && DesktopPatchedServer == other.DesktopPatchedServer &&
+        DesktopPatchedClient == other.DesktopPatchedClient &&
         PanicHotkey.SequenceEqual(other.PanicHotkey) && LogLevel == other.LogLevel;
 
     public override int GetHashCode() => HashCode.Combine(ScrcpyDir, Edge, Monitor, EnterDwellMs, ExitDwellMs, Sensitivity, ForwardKeyboard, LogLevel);

@@ -94,8 +94,6 @@ internal static class User32
     public const int VK_MENU = 0x12;
     public const int VK_LWIN = 0x5B;
     public const int VK_RWIN = 0x5C;
-    public const ushort VK_RCONTROL = 0xA3;
-    public const ushort SCAN_CONTROL = 0x1D;
     public const uint INPUT_KEYBOARD = 1;
     public const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
     public const uint KEYEVENTF_KEYUP = 0x0002;

@@ -28,8 +28,8 @@ public sealed class InputRouter
     // Buttons held on the PC. Crossing while one is held would swallow its release and leave Windows thinking it is still down.
     private HidMouseButtons _pcButtons;
     private bool _dragAtEdgeRaised;
-    // The phone desktop keeps the phone awake, so its own screen is only lit while the mouse is on it.
-    private bool _desktopOpen;
+    // While the phone desktop keeps the phone awake, its own screen is only lit while the mouse is on it.
+    private bool _phoneKeptAwake;
     private bool _screenOffByUs;
     private int _wheelAcc, _panAcc;
     private int _cursorX, _cursorY;
@@ -67,7 +67,7 @@ public sealed class InputRouter
             _enter.Reset();
             _log($"Phone ready: {width}x{height}, {pixelsPerCount:0.###} px per count");
             _screenOffByUs = false; // a new server; the previous one turned the screen back on when it exited
-            if (_desktopOpen && !OnPhone) TurnScreenOff();
+            if (_phoneKeptAwake && !OnPhone) TurnScreenOff();
         }
     }
 
@@ -83,13 +83,13 @@ public sealed class InputRouter
         FlushModeChanged();
     }
 
-    /// <summary>The phone desktop window opened or closed.</summary>
-    public void SetDesktopOpen(bool open)
+    /// <summary>The phone desktop window started or stopped keeping the phone awake (it opened or closed).</summary>
+    public void SetPhoneKeptAwake(bool keptAwake)
     {
         lock (_lock)
         {
-            _desktopOpen = open;
-            if (open && PhoneReady && !OnPhone) TurnScreenOff();
+            _phoneKeptAwake = keptAwake;
+            if (keptAwake && PhoneReady && !OnPhone) TurnScreenOff();
         }
     }
 
@@ -279,7 +279,7 @@ public sealed class InputRouter
         {
             if (_buttons != HidMouseButtons.None) _sink.SendMouse(MouseReport.Encode(HidMouseButtons.None, 0, 0, 0, 0));
             if (_cfg.ForwardKeyboard) _sink.SendKeyboard(KeyboardState.EmptyReport);
-            if (_desktopOpen) TurnScreenOff();
+            if (_phoneKeptAwake) TurnScreenOff();
         }
         _buttons = HidMouseButtons.None;
         _keyboard.ReleaseAll();

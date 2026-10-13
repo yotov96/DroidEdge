@@ -42,6 +42,52 @@ public class ConfigLoaderTests
     }
 
     [Fact]
+    public void Desktop_window_customizations_are_on_by_default()
+    {
+        AppConfig cfg = ConfigLoader.Parse("{}", _ => { });
+        Assert.Equal("uhid", cfg.DesktopKeyboard);
+        Assert.Equal("uhid", cfg.DesktopMouse);
+        Assert.Equal("rctrl", cfg.DesktopShortcutMod);
+        Assert.True(cfg.DesktopTildeReleasesMouse);
+        Assert.True(cfg.DesktopKeepAwake);
+        Assert.True(cfg.DesktopKeepAppsOnClose);
+        Assert.True(cfg.DesktopPatchedServer);
+        Assert.True(cfg.DesktopPatchedClient);
+    }
+
+    [Fact]
+    public void Desktop_window_customizations_can_be_turned_off()
+    {
+        List<string> warnings = [];
+        AppConfig cfg = ConfigLoader.Parse("""
+            {"desktopKeyboard":"SDK","desktopMouse":"sdk","desktopShortcutMod":" LAlt , lsuper ","desktopTildeReleasesMouse":false,
+             "desktopKeepAwake":false,"desktopKeepAppsOnClose":false,"desktopPatchedServer":false,"desktopPatchedClient":false}
+            """, warnings.Add);
+        Assert.Empty(warnings);
+        Assert.Equal("sdk", cfg.DesktopKeyboard);
+        Assert.Equal("sdk", cfg.DesktopMouse);
+        Assert.Equal("lalt,lsuper", cfg.DesktopShortcutMod);
+        Assert.False(cfg.DesktopTildeReleasesMouse);
+        Assert.False(cfg.DesktopKeepAwake);
+        Assert.False(cfg.DesktopKeepAppsOnClose);
+        Assert.False(cfg.DesktopPatchedServer);
+        Assert.False(cfg.DesktopPatchedClient);
+        Assert.NotEqual(AppConfig.Default, cfg);
+    }
+
+    [Fact]
+    public void Invalid_desktop_input_settings_fall_back_and_warn()
+    {
+        List<string> warnings = [];
+        AppConfig cfg = ConfigLoader.Parse("""{"desktopKeyboard":"aoa","desktopMouse":"","desktopShortcutMod":"lctrl,tilde"}""", warnings.Add);
+        Assert.Equal("uhid", cfg.DesktopKeyboard);
+        Assert.Equal("uhid", cfg.DesktopMouse);
+        Assert.Equal("rctrl", cfg.DesktopShortcutMod);
+        Assert.Equal(3, warnings.Count);
+        Assert.Equal("rctrl", ConfigLoader.Parse("""{"desktopShortcutMod":" , "}""", _ => { }).DesktopShortcutMod);
+    }
+
+    [Fact]
     public void Partial_json_overrides_only_given_fields()
     {
         var cfg = ConfigLoader.Parse("""{"edge":"right","enterDwellMs":250,"sensitivity":1.5,"rightClickIsBack":false,"middleClickIsDone":false}""", _ => { });

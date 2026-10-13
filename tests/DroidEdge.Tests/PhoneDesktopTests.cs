@@ -24,4 +24,22 @@ public class PhoneDesktopTests
         Assert.DoesNotContain("--flex-display", args);
         Assert.Contains("--new-display", PhoneDesktop.BuildArguments("SER1", AppConfig.Default with { DesktopDisplay = "" }));
     }
+
+    [Fact]
+    public void Arguments_without_the_customizations_are_plain_scrcpy_options()
+    {
+        AppConfig cfg = AppConfig.Default with
+        {
+            DesktopKeyboard = "sdk",
+            DesktopMouse = "sdk",
+            DesktopShortcutMod = "lalt,lsuper",
+            DesktopKeepAwake = false,
+            DesktopKeepAppsOnClose = false,
+        };
+        Assert.Equal(new[]
+        {
+            "-s", "SER1", "--new-display=1920x1080", "--flex-display", "--keyboard=sdk", "--mouse=sdk", "--shortcut-mod=lalt,lsuper",
+            "--no-audio", "--no-clipboard-autosync", "--window-title=Phone desktop",
+        }, PhoneDesktop.BuildArguments("SER1", cfg));
+    }
 }

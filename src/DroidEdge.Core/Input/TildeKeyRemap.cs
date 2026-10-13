@@ -1,10 +1,10 @@
 namespace DroidEdge.Core.Input;
 
-public enum TildeKeyAction { PassThrough, Swallow, SwallowAndTapRightControl }
+public enum TildeKeyAction { PassThrough, Swallow, SwallowAndTapShortcutKey }
 
 /// <summary>
-/// Turns a plain press of the tilde key into a Right Ctrl tap while the phone desktop window is active. The window
-/// releases its captured mouse on Right Ctrl, and scrcpy only accepts Ctrl, Alt or Super keys for that.
+/// Turns a plain press of the tilde key into a tap of scrcpy's shortcut key while the phone desktop window is active.
+/// The window releases its captured mouse on that key, and scrcpy only accepts Ctrl, Alt or Super keys for it.
 /// </summary>
 public sealed class TildeKeyRemap
 {
@@ -30,6 +30,6 @@ public sealed class TildeKeyRemap
         _held = true;
         if (!desktopActive || modifierHeld) return TildeKeyAction.PassThrough;
         _swallowed = true;
-        return TildeKeyAction.SwallowAndTapRightControl;
+        return TildeKeyAction.SwallowAndTapShortcutKey;
     }
 }
