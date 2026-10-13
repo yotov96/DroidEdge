@@ -104,14 +104,58 @@ closed with the display.
 `desktopFlex` (default) the display resizes to match the window. Both are read each time the window opens.
 
 ### Patched scrcpy
-`scrcpy/droidedge.patch` holds DroidEdge's changes to scrcpy v4.1. DroidEdge uses the patched builds for the desktop
-window when they are in `dist` (unless `desktopPatchedServer` or `desktopPatchedClient` is off), and stock scrcpy
-otherwise; the log says which were used.
-- **Server** (`dist\scrcpy-server-desktop`): with stock scrcpy, the taskbar and app list on the virtual display open
-  nothing, because Android only lets a secondary display host desktop windows if it can switch between mirroring and
-  extending. On Android 17 the patched server creates such a display, so apps open as desktop windows. On older
-  Android, or if Android rejects it, the server behaves like stock scrcpy.
-- **Client** (`dist\scrcpy-desktop\scrcpy.exe`): takes the keyboard while it holds the mouse (see above).
+`scrcpy/droidedge.patch` holds DroidEdge's changes to scrcpy v4.1, as three commits: two for the server, one for the
+client. DroidEdge uses the patched builds for the desktop window when they are in `dist` (unless `desktopPatchedServer`
+or `desktopPatchedClient` is off), and stock scrcpy otherwise; the log says which were used. Upstream scrcpy has
+neither change as of v4.1.
+
+**Server** (`dist\scrcpy-server-desktop`): apps open from the desktop's taskbar and app list, as desktop windows.
+
+With stock scrcpy the virtual display shows a taskbar and an app list, but tapping an app opens nothing (scrcpy issue
+[#6936](https://github.com/Genymobile/scrcpy/issues/6936)). The launcher hands the launch to Android's desktop
+windowing, which refuses the display (`desktop ineligible` in logcat), and the launch is dropped. Android lets a display
+other than the phone screen host desktop windows only if it shows system decorations and can switch between mirroring
+and extending the phone screen (`DisplayContent.isEligibleForDesktopMode` in AOSP). On Android 16 a virtual display
+cannot get that ability. Android 17 adds `VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH` for it, a hidden system API,
+but ignores it on a display that also has `OWN_CONTENT_ONLY` or `SHOULD_SHOW_SYSTEM_DECORATIONS`. Stock scrcpy always
+sets the first and by default the second, so it cannot get desktop windows on Android 17 either.
+
+On Android 17 the patched server creates the display with the new flag instead of those two; the display then shows
+system decorations while it extends the phone screen, and Android accepts it for desktop windows. If Android drops the
+flag (a build with the feature off), a display without `OWN_CONTENT_ONLY` would mirror the phone screen, so the server
+closes it and creates a stock one. Below Android 17 it behaves like stock scrcpy.
+
+A display that can switch content mode also joins Android's display arrangement (Settings → Connected devices →
+External display), which Android remembers per set of display unique ids. A virtual display gets a new unique id each
+time it is created (`virtual:com.android.shell,2000,scrcpy,N`), so the position you chose was forgotten and the desktop
+came back above the phone every time. The patched server gives it the fixed id `scrcpy-desktop`, through the hidden
+`VirtualDisplayConfig.Builder.setUniqueId` (which needs `ADD_TRUSTED_DISPLAY`; scrcpy's server, running as the adb
+shell user, is allowed it). If that fails, it creates the display without a fixed id.
+
+What does not work instead (tried on Android 16):
+- `adb shell settings put global force_desktop_mode_on_external_displays 1`: no effect while running, and the phone
+  resets it to 0 on reboot.
+- Switching the virtual display to freeform windowing (`cmd window set-display-windowing-mode`): launches from the
+  taskbar still fail.
+- Android's overlay display (developer option *Simulate secondary displays*): with no options it does get desktop
+  windows, but it is a fixed-size, translucent floating window on the phone screen.
+- `persist.wm.debug.desktop_mode_enforce_device_restrictions=false`: SELinux does not let the shell user set it.
+
+**Client** (`dist\scrcpy-desktop\scrcpy.exe`): takes the keyboard while it holds the mouse.
+
+When stock scrcpy captures the mouse it only switches to relative mouse mode; Windows still offers every key press to
+other programs' global shortcuts before the window gets it. With GlazeWM and PowerToys Run, for example, Ctrl+Space and
+Ctrl+Enter fired on Windows instead of reaching the phone. scrcpy has no option to grab the keyboard, so the patch turns
+on SDL's keyboard grab together with the mouse capture (`SDL_SetWindowKeyboardGrab` in `app/src/mouse_capture.c`). On
+Windows, SDL then installs its own low-level keyboard hook. Windows calls the most recently installed hook first, so
+SDL's runs before the other programs' and keeps Ctrl, Alt, Win, Tab, Esc and Print Screen for the window. Other keys
+pass through, but the other programs never see a modifier held, so their combinations do not fire. Releasing the mouse
+removes the hook.
+
+DroidEdge cannot do this from its own keyboard hook: the window is a separate `scrcpy.exe` process, so DroidEdge cannot
+tell when it holds the mouse, and its hook only runs before other programs' hooks if it was installed after them.
+While the window holds the mouse, Ctrl+Alt+Del still goes to Windows, and DroidEdge's panic hotkey does not work,
+because SDL's hook keeps both Ctrl keys; release the mouse first.
 
 One-time phone setup for desktop windows on Android 17:
 - Keep the phone screen in the display arrangement:
