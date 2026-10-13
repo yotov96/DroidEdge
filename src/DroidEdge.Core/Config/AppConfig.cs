@@ -2,7 +2,9 @@ namespace DroidEdge.Core.Config;
 
 public sealed record AppConfig
 {
-    public string ScrcpyDir { get; init; } = @"C:\Users\you\AppData\Local\Programs\scrcpy";
+    /// <summary>Folder with scrcpy.exe, adb.exe and scrcpy-server (an unzipped scrcpy release).</summary>
+    public string ScrcpyDir { get; init; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "scrcpy");
     public string? DeviceSerial { get; init; }
     public Edge Edge { get; init; } = Edge.Left;
     /// <summary>"primary" or a zero-based monitor index as a string.</summary>
@@ -13,7 +15,7 @@ public sealed record AppConfig
     public bool ForwardKeyboard { get; init; } = true;
     /// <summary>Send right-click as Android Back instead of a secondary mouse button.</summary>
     public bool RightClickIsBack { get; init; } = true;
-    /// <summary>Middle-click while on the phone locks the phone (Power press) and returns the mouse to the PC.</summary>
+    /// <summary>Middle-click while on the phone turns the phone screen off and returns the mouse to the PC.</summary>
     public bool MiddleClickIsDone { get; init; } = true;
     /// <summary>Phone copies land in the Windows clipboard; the Windows clipboard is sent to the phone when crossing.</summary>
     public bool SyncClipboard { get; init; } = true;

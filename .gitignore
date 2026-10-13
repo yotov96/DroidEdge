@@ -1,9 +1,17 @@
+# Build output
 bin/
 obj/
+dist/
+TestResults/
+
+# IDE files
 *.user
 .vs/
+.idea/
+
+# Files DroidEdge writes next to its executable
 droidedge.log*
 droidedge.json
 droidedge-diag.txt
-dist/
+
 .superpowers/
