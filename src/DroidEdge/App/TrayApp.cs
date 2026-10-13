@@ -37,6 +37,8 @@ public sealed class TrayApp : ApplicationContext
 
         _tray = new TrayIcon(
             onOpenDesktop: OpenDesktopFromTray,
+            isCaptureMouseOn: () => LoadFreshConfig().DesktopMouse == "uhid",
+            onCaptureMouseToggle: SetDesktopMouseCapture,
             onSendFiles: PickAndSendFiles,
             onReturnMouse: () => _router!.ReturnToPc(),
             onDiagnostics: () => _ = RunDiagnosticsAsync(),
@@ -113,6 +115,31 @@ public sealed class TrayApp : ApplicationContext
     {
         if (_phone is { } phone) OpenDesktop(phone, LoadFreshConfig(), bringToFront: true);
         else _tray.Balloon("DroidEdge", "The phone is not connected", ToolTipIcon.Warning);
+    }
+
+    // Tray toggle for desktopMouse. scrcpy cannot switch mouse modes in a running window, so an open window is reopened.
+    private void SetDesktopMouseCapture(bool capture)
+    {
+        try
+        {
+            ConfigLoader.SetValue(Program.ConfigPath, "desktopMouse", capture ? "uhid" : "sdk");
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Could not save desktopMouse");
+            _tray.Balloon("DroidEdge", $"Could not save the setting: {ex.Message}", ToolTipIcon.Error);
+            return;
+        }
+        _log.Information("Phone desktop mouse capture turned {State}", capture ? "on" : "off");
+        if (_desktop.IsOpen)
+        {
+            _desktop.Close();
+            // The phone releases the old virtual display shortly after scrcpy exits, and the new one reuses its unique id
+            Task.Delay(1000).ContinueWith(_ => Ui(() =>
+            {
+                if (_phone is { } phone) OpenDesktop(phone, LoadFreshConfig(), bringToFront: true);
+            }));
+        }
     }
 
     private void OpenDesktop(PhoneConnection phone, AppConfig cfg, bool bringToFront)

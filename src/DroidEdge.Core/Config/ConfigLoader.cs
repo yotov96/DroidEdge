@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace DroidEdge.Core.Config;
@@ -56,6 +57,25 @@ public static class ConfigLoader
         try { json = File.ReadAllText(path); }
         catch (Exception ex) { warn($"Could not read config '{path}': {ex.Message}"); return AppConfig.Default; }
         return Parse(json, warn);
+    }
+
+    /// <summary>
+    /// Sets one setting in the config file, creating the file if needed and keeping the other settings. The file is
+    /// written back from the parsed JSON, so comments in it are lost.
+    /// </summary>
+    /// <exception cref="JsonException">The file is not valid JSON; it is left unchanged.</exception>
+    public static void SetValue(string path, string name, string value)
+    {
+        string json = File.Exists(path) ? File.ReadAllText(path) : "";
+        JsonDocumentOptions options = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
+        JsonObject settings = string.IsNullOrWhiteSpace(json)
+            ? new JsonObject()
+            : JsonNode.Parse(json, documentOptions: options) as JsonObject ?? throw new JsonException("The config is not a JSON object");
+        // Settings are read case-insensitively, so drop any spelling of the name before adding the canonical one
+        foreach (string existing in settings.Select(p => p.Key).Where(k => k.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList())
+            settings.Remove(existing);
+        settings[name] = value;
+        File.WriteAllText(path, settings.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
 
     public static AppConfig Parse(string json, Action<string> warn)

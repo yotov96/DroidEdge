@@ -9,10 +9,14 @@ public sealed class TrayIcon : IDisposable
     private readonly NotifyIcon _icon;
     private readonly ToolStripMenuItem _status;
     private readonly ToolStripMenuItem _startup;
+    private readonly ToolStripMenuItem _captureMouse;
     private readonly Dictionary<TrayColor, Icon> _icons = new();
     private bool _suppressStartupEvent;
+    private bool _suppressCaptureMouseEvent;
 
-    public TrayIcon(Action onOpenDesktop, Action onSendFiles, Action onReturnMouse, Action onDiagnostics, Action onOpenLog, Action onOpenConfig, Action<bool> onStartupToggle, Action onExit)
+    /// <param name="isCaptureMouseOn">Read when the menu opens, so the check mark follows edits to the config file.</param>
+    public TrayIcon(Action onOpenDesktop, Func<bool> isCaptureMouseOn, Action<bool> onCaptureMouseToggle, Action onSendFiles, Action onReturnMouse,
+        Action onDiagnostics, Action onOpenLog, Action onOpenConfig, Action<bool> onStartupToggle, Action onExit)
     {
         UiControl = new Control();
         _ = UiControl.Handle; // force creation on this (UI) thread so BeginInvoke works from other threads
@@ -22,11 +26,15 @@ public sealed class TrayIcon : IDisposable
         _status = new ToolStripMenuItem("Starting…") { Enabled = false };
         _startup = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true };
         _startup.CheckedChanged += (_, _) => { if (!_suppressStartupEvent) onStartupToggle(_startup.Checked); };
+        _captureMouse = new ToolStripMenuItem("Capture mouse in phone desktop") { CheckOnClick = true };
+        _captureMouse.CheckedChanged += (_, _) => { if (!_suppressCaptureMouseEvent) onCaptureMouseToggle(_captureMouse.Checked); };
 
         var menu = new ContextMenuStrip();
+        menu.Opening += (_, _) => SetChecked(_captureMouse, isCaptureMouseOn(), ref _suppressCaptureMouseEvent);
         menu.Items.Add(_status);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Open phone desktop", null, (_, _) => onOpenDesktop());
+        menu.Items.Add(_captureMouse);
         menu.Items.Add("Send files to phone…", null, (_, _) => onSendFiles());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Return mouse to PC", null, (_, _) => onReturnMouse());
@@ -51,11 +59,14 @@ public sealed class TrayIcon : IDisposable
 
     public void Balloon(string title, string text, ToolTipIcon icon) => _icon.ShowBalloonTip(3000, title, text, icon);
 
-    public void SetStartupChecked(bool checked_)
+    public void SetStartupChecked(bool checked_) => SetChecked(_startup, checked_, ref _suppressStartupEvent);
+
+    // Sets a check mark without raising the item's toggle callback
+    private static void SetChecked(ToolStripMenuItem item, bool value, ref bool suppress)
     {
-        _suppressStartupEvent = true;
-        _startup.Checked = checked_;
-        _suppressStartupEvent = false;
+        suppress = true;
+        item.Checked = value;
+        suppress = false;
     }
 
     private static Icon MakeIcon(TrayColor c)

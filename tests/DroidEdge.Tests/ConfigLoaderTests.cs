@@ -42,11 +42,11 @@ public class ConfigLoaderTests
     }
 
     [Fact]
-    public void Desktop_window_customizations_are_on_by_default()
+    public void Desktop_window_defaults_capture_no_mouse_but_keep_the_other_customizations()
     {
         AppConfig cfg = ConfigLoader.Parse("{}", _ => { });
         Assert.Equal("uhid", cfg.DesktopKeyboard);
-        Assert.Equal("uhid", cfg.DesktopMouse);
+        Assert.Equal("sdk", cfg.DesktopMouse);
         Assert.Equal("rctrl", cfg.DesktopShortcutMod);
         Assert.True(cfg.DesktopTildeReleasesMouse);
         Assert.True(cfg.DesktopKeepAwake);
@@ -81,7 +81,7 @@ public class ConfigLoaderTests
         List<string> warnings = [];
         AppConfig cfg = ConfigLoader.Parse("""{"desktopKeyboard":"aoa","desktopMouse":"","desktopShortcutMod":"lctrl,tilde"}""", warnings.Add);
         Assert.Equal("uhid", cfg.DesktopKeyboard);
-        Assert.Equal("uhid", cfg.DesktopMouse);
+        Assert.Equal("sdk", cfg.DesktopMouse);
         Assert.Equal("rctrl", cfg.DesktopShortcutMod);
         Assert.Equal(3, warnings.Count);
         Assert.Equal("rctrl", ConfigLoader.Parse("""{"desktopShortcutMod":" , "}""", _ => { }).DesktopShortcutMod);

@@ -82,11 +82,13 @@ phone sleeps and locks after its normal screen timeout, and the desktop stops re
 **scrcpy**; set its layouts like DroidEdge's. scrcpy's `sdk` mode types through Android's US layout and drops
 non-Latin characters such as Cyrillic.
 
-**Mouse** (`desktopMouse`): the window has its own USB mouse too (scrcpy `--mouse=uhid`). Click into the window and it
-captures the Windows cursor and sends relative movement, so apps that take over the pointer, such as Moonlight, show a
-single pointer instead of a remote one trailing the Windows cursor. The phone cursor starts where it last was; if it
-is on the phone screen, move it down onto the desktop. All buttons go through unchanged. With `sdk`, the window works
-like a normal window instead: no capture, right-click is Back.
+**Mouse** (`desktopMouse`): by default the window works like a normal window (scrcpy `--mouse=sdk`): clicks land where
+you click, right-click is Back. For remote-desktop and game-streaming apps such as Moonlight, turn on tray →
+**Capture mouse in phone desktop** (`desktopMouse: uhid`; an open window reopens to apply it, which moves its apps to
+the phone screen). The window then has its own USB mouse: click into it and it captures the Windows cursor and sends
+relative movement, so those apps show a single pointer instead of a remote one trailing the Windows cursor. The phone
+cursor starts where it last was; if it is on the phone screen, move it down onto the desktop. All buttons go through
+unchanged.
 - Release the mouse with the **tilde key** (left of 1) or **Right Ctrl**. Right Ctrl is scrcpy's shortcut key here
   (`desktopShortcutMod`, scrcpy's `--shortcut-mod`), so Alt and Super reach the phone. scrcpy only accepts Ctrl, Alt
   or Super keys for this, so DroidEdge turns a plain tilde press into the first shortcut key while the window is
@@ -200,7 +202,7 @@ installed scrcpy's version (4.1). After updating scrcpy, apply the patch to the 
 | `desktopDisplay` | `"1920x1080"` | Phone desktop size and density, in scrcpy's `--new-display` syntax. |
 | `desktopFlex` | `true` | Resize the phone desktop to follow its window. |
 | `desktopKeyboard` | `uhid` | The window's keyboard (scrcpy `--keyboard`): `uhid`, `sdk` or `disabled`. |
-| `desktopMouse` | `uhid` | The window's mouse (scrcpy `--mouse`): `uhid` (captured), `sdk` (plain window) or `disabled`. |
+| `desktopMouse` | `sdk` | The window's mouse (scrcpy `--mouse`): `sdk` (plain window), `uhid` (captured; tray → Capture mouse in phone desktop) or `disabled`. |
 | `desktopShortcutMod` | `rctrl` | scrcpy's shortcut key (`--shortcut-mod`), which also releases the mouse: comma-separated `lctrl`, `rctrl`, `lalt`, `ralt`, `lsuper`, `rsuper`. |
 | `desktopTildeReleasesMouse` | `true` | The tilde key taps the first shortcut key while the window is active (with `desktopMouse: uhid`). |
 | `desktopKeepAwake` | `true` | Keep the phone awake and unlocked while the window is open, its screen dark unless the mouse is on it. |

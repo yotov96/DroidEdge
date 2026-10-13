@@ -28,7 +28,7 @@ public sealed record AppConfig
     /// <summary>scrcpy --keyboard mode for the desktop window: "uhid" (follows the phone's layouts), "sdk" or "disabled".</summary>
     public string DesktopKeyboard { get; init; } = "uhid";
     /// <summary>scrcpy --mouse mode for the desktop window: "uhid" (captured, relative), "sdk" (plain window) or "disabled".</summary>
-    public string DesktopMouse { get; init; } = "uhid";
+    public string DesktopMouse { get; init; } = "sdk";
     /// <summary>scrcpy --shortcut-mod for the desktop window: comma-separated lctrl, rctrl, lalt, ralt, lsuper, rsuper.</summary>
     public string DesktopShortcutMod { get; init; } = "rctrl";
     /// <summary>The tilde key taps the first shortcut key, which releases the captured mouse (with DesktopMouse "uhid").</summary>
