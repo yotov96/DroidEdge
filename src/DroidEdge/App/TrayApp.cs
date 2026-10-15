@@ -21,6 +21,7 @@ public sealed class TrayApp : ApplicationContext
     private readonly PhoneDesktop _desktop;
     private readonly ClipboardSync _clipboard;
     private DropZoneWindow _dropZone = null!;
+    private GlobalHotkeys _hotkeys = null!;
     private volatile PhoneConnection? _phone;
     private PhoneSession? _session;
     private SessionState _lastState = SessionState.Stopped;
@@ -38,7 +39,7 @@ public sealed class TrayApp : ApplicationContext
         _tray = new TrayIcon(
             onOpenDesktop: OpenDesktopFromTray,
             isCaptureMouseOn: () => LoadFreshConfig().DesktopMouse == "uhid",
-            onCaptureMouseToggle: SetDesktopMouseCapture,
+            onCaptureMouseToggle: capture => SetDesktopMouseCapture(capture),
             onSendFiles: PickAndSendFiles,
             onReturnMouse: () => _router!.ReturnToPc(),
             onDiagnostics: () => _ = RunDiagnosticsAsync(),
@@ -86,6 +87,17 @@ public sealed class TrayApp : ApplicationContext
             _hooks.PanicPressed += () => _router.ReturnToPc();
             _hooks.Start();
 
+            // Read once at startup; changing a hotkey needs a restart
+            _hotkeys = new GlobalHotkeys(log);
+            string[] hotkeyErrors = new[]
+            {
+                _hotkeys.Register("hotkeyOpenDesktop", cfg.HotkeyOpenDesktop, OpenDesktopFromTray),
+                _hotkeys.Register("hotkeyToggleMouseCapture", cfg.HotkeyToggleMouseCapture, ToggleDesktopMouseCapture),
+                _hotkeys.Register("hotkeySendFiles", cfg.HotkeySendFiles, PickAndSendFiles),
+            }.OfType<string>().ToArray();
+            foreach (string error in hotkeyErrors) _log.Warning("Hotkey {Error}", error);
+            if (hotkeyErrors.Length > 0) _tray.Balloon("DroidEdge hotkeys", string.Join("\n", hotkeyErrors), ToolTipIcon.Warning);
+
             foreach (var w in configWarnings) _tray.Balloon("DroidEdge config", w, ToolTipIcon.Warning);
 
             var installError = ScrcpyInstall.Validate(cfg.ScrcpyDir, ScrcpyInstall.RunVersion);
@@ -100,6 +112,7 @@ public sealed class TrayApp : ApplicationContext
         }
         catch
         {
+            _hotkeys?.Dispose();
             _hooks?.Dispose();
             _raw?.Dispose();
             _dropZone?.Dispose();
@@ -117,8 +130,16 @@ public sealed class TrayApp : ApplicationContext
         else _tray.Balloon("DroidEdge", "The phone is not connected", ToolTipIcon.Warning);
     }
 
+    // Hotkey for the tray toggle; the balloon stands in for the menu's check mark
+    private void ToggleDesktopMouseCapture()
+    {
+        bool capture = LoadFreshConfig().DesktopMouse != "uhid";
+        if (SetDesktopMouseCapture(capture))
+            _tray.Balloon("DroidEdge", $"Mouse capture in the phone desktop is {(capture ? "on" : "off")}", ToolTipIcon.Info);
+    }
+
     // Tray toggle for desktopMouse. scrcpy cannot switch mouse modes in a running window, so an open window is reopened.
-    private void SetDesktopMouseCapture(bool capture)
+    private bool SetDesktopMouseCapture(bool capture)
     {
         try
         {
@@ -128,7 +149,7 @@ public sealed class TrayApp : ApplicationContext
         {
             _log.Error(ex, "Could not save desktopMouse");
             _tray.Balloon("DroidEdge", $"Could not save the setting: {ex.Message}", ToolTipIcon.Error);
-            return;
+            return false;
         }
         _log.Information("Phone desktop mouse capture turned {State}", capture ? "on" : "off");
         if (_desktop.IsOpen)
@@ -140,6 +161,7 @@ public sealed class TrayApp : ApplicationContext
                 if (_phone is { } phone) OpenDesktop(phone, LoadFreshConfig(), bringToFront: true);
             }));
         }
+        return true;
     }
 
     private void OpenDesktop(PhoneConnection phone, AppConfig cfg, bool bringToFront)
@@ -153,7 +175,7 @@ public sealed class TrayApp : ApplicationContext
     {
         _router.SetPhoneKeptAwake(_desktop.KeepsPhoneAwake);
         _hooks.DesktopProcessId = _desktop.ProcessId;
-        _hooks.DesktopReleaseKey = _desktop.TildeReleaseKey is { } name ? ScrcpyShortcutKey.FromName(name) : null;
+        _hooks.DesktopReleaseKey = _desktop.ReleaseKey;
     }
 
     private void ShowDropZone(int cursorX, int cursorY)
@@ -342,6 +364,7 @@ public sealed class TrayApp : ApplicationContext
         }
         _session?.Dispose();
         _desktop.Dispose();
+        _hotkeys.Dispose();
         _hooks.Dispose();
         _raw.Dispose();
         _dropZone.Dispose();

@@ -42,7 +42,12 @@ green when the phone is connected and blue while the mouse is on the phone.
 - **Right-click** is Android **Back** (`rightClickIsBack: false` for a normal secondary button).
 - **Middle-click** turns the phone screen off and returns the mouse to the PC (`middleClickIsDone: false` for a normal
   middle button). It does not lock the phone; crossing back turns the screen on again.
-- **Panic:** hold **Left Ctrl + Right Ctrl** to return instantly.
+- **Panic:** hold **Left Ctrl + Right Ctrl** to return instantly (`panicHotkey`).
+- **Hotkeys:** opening the phone desktop, switching its mouse capture and sending files can each get a system-wide
+  hotkey such as `Ctrl+Alt+D` (`hotkeyOpenDesktop`, `hotkeyToggleMouseCapture`, `hotkeySendFiles`; none by default).
+  They are registered at startup, so changing one needs a restart; if another program already uses a combination,
+  DroidEdge says so in a notification. They do not fire while the mouse is on the phone, because DroidEdge then keeps
+  the keys from Windows.
 - `DroidEdge.exe --diag` (or tray → Run diagnostics) runs an end-to-end check and shows a report.
 
 ### Clipboard
@@ -91,8 +96,10 @@ cursor starts where it last was; if it is on the phone screen, move it down onto
 unchanged.
 - Release the mouse with the **tilde key** (left of 1) or **Right Ctrl**. Right Ctrl is scrcpy's shortcut key here
   (`desktopShortcutMod`, scrcpy's `--shortcut-mod`), so Alt and Super reach the phone. scrcpy only accepts Ctrl, Alt
-  or Super keys for this, so DroidEdge turns a plain tilde press into the first shortcut key while the window is
-  active (`desktopTildeReleasesMouse`). That press never reaches the phone; Shift+tilde and other combinations do.
+  or Super keys for this, so DroidEdge turns a plain press of the release key (`desktopReleaseKey`, any
+  [key name](#key-names), `Tilde` by default, `""` for none) into the first shortcut key while the window is active.
+  The key is matched by its physical position, so it is the same key in every keyboard layout. That press never
+  reaches the phone; Shift+key and other combinations do.
 - scrcpy's other shortcuts use the shortcut key too, e.g. Right Ctrl+F for fullscreen.
 - With the patched scrcpy client (`desktopPatchedClient`), the window also takes the keyboard while it holds the mouse:
   Ctrl, Alt, Win, Tab and Esc go to the window first, so other programs' global shortcuts (window managers, launchers)
@@ -204,13 +211,31 @@ installed scrcpy's version (4.1). After updating scrcpy, apply the patch to the 
 | `desktopKeyboard` | `uhid` | The window's keyboard (scrcpy `--keyboard`): `uhid`, `sdk` or `disabled`. |
 | `desktopMouse` | `sdk` | The window's mouse (scrcpy `--mouse`): `sdk` (plain window), `uhid` (captured; tray → Capture mouse in phone desktop) or `disabled`. |
 | `desktopShortcutMod` | `rctrl` | scrcpy's shortcut key (`--shortcut-mod`), which also releases the mouse: comma-separated `lctrl`, `rctrl`, `lalt`, `ralt`, `lsuper`, `rsuper`. |
-| `desktopTildeReleasesMouse` | `true` | The tilde key taps the first shortcut key while the window is active (with `desktopMouse: uhid`). |
+| `desktopReleaseKey` | `Tilde` | [Key](#key-names) that taps the first shortcut key while the window is active, releasing the mouse (with `desktopMouse: uhid`); `""` for none. |
 | `desktopKeepAwake` | `true` | Keep the phone awake and unlocked while the window is open, its screen dark unless the mouse is on it. |
 | `desktopKeepAppsOnClose` | `true` | Closing the window moves its apps to the phone screen instead of closing them. |
 | `desktopPatchedServer` | `true` | Use the patched scrcpy server when it is built (desktop windows on Android 17). |
 | `desktopPatchedClient` | `true` | Use the patched scrcpy client when it is built (keyboard grab while the mouse is captured). |
-| `panicHotkey` | `["LControl", "RControl"]` | Keys held together to return the mouse: `LControl`, `RControl`, `LShift`, `RShift`, `LAlt`, `RAlt`, `LWin`, `RWin`, `Escape`, `Pause`, `ScrollLock`, `F12`. |
+| `panicHotkey` | `["LControl", "RControl"]` | [Keys](#key-names) held together to return the mouse. |
+| `hotkeyOpenDesktop` | none | Hotkey for tray → Open phone desktop, e.g. `"Ctrl+Alt+D"`. |
+| `hotkeyToggleMouseCapture` | none | Hotkey for tray → Capture mouse in phone desktop; a notification shows the new state. |
+| `hotkeySendFiles` | none | Hotkey for tray → Send files to phone. |
 | `logLevel` | `Info` | `Debug`, `Info`, `Warning` or `Error`. |
+
+### Key names
+Settings that take a key use these names, ignoring case. Letters, digits and punctuation are named after their place
+on a US layout, but the physical key is the same in every layout.
+- Letters and digits: `A`–`Z`, `0`–`9`
+- Function keys: `F1`–`F24`
+- Punctuation: `Tilde` (the key left of 1), `Minus`, `Equals`, `LeftBracket`, `RightBracket`, `Backslash`, `Semicolon`,
+  `Quote`, `Comma`, `Period`, `Slash`
+- Other keys: `Escape`, `Tab`, `CapsLock`, `Space`, `Enter`, `Backspace`, `Insert`, `Delete`, `Home`, `End`, `PageUp`,
+  `PageDown`, `Up`, `Down`, `Left`, `Right`, `PrintScreen`, `ScrollLock`, `Pause`, `NumLock`, `Apps` (the context-menu
+  key)
+- Modifiers: `LControl`, `RControl`, `LShift`, `RShift`, `LAlt`, `RAlt`, `LWin`, `RWin`
+
+Hotkeys combine modifiers and one other key with `+`: `Ctrl`, `Alt`, `Shift`, `Win`, then a key name, as in
+`Ctrl+Alt+D`, `Win+Shift+F9` or just `F13`.
 
 Logs go to `droidedge.log` next to the executable (tray → Open log).
 

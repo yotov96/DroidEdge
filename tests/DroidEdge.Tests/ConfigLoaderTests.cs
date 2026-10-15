@@ -48,7 +48,7 @@ public class ConfigLoaderTests
         Assert.Equal("uhid", cfg.DesktopKeyboard);
         Assert.Equal("sdk", cfg.DesktopMouse);
         Assert.Equal("rctrl", cfg.DesktopShortcutMod);
-        Assert.True(cfg.DesktopTildeReleasesMouse);
+        Assert.Equal("Tilde", cfg.DesktopReleaseKey);
         Assert.True(cfg.DesktopKeepAwake);
         Assert.True(cfg.DesktopKeepAppsOnClose);
         Assert.True(cfg.DesktopPatchedServer);
@@ -60,14 +60,14 @@ public class ConfigLoaderTests
     {
         List<string> warnings = [];
         AppConfig cfg = ConfigLoader.Parse("""
-            {"desktopKeyboard":"SDK","desktopMouse":"sdk","desktopShortcutMod":" LAlt , lsuper ","desktopTildeReleasesMouse":false,
+            {"desktopKeyboard":"SDK","desktopMouse":"sdk","desktopShortcutMod":" LAlt , lsuper ","desktopReleaseKey":"",
              "desktopKeepAwake":false,"desktopKeepAppsOnClose":false,"desktopPatchedServer":false,"desktopPatchedClient":false}
             """, warnings.Add);
         Assert.Empty(warnings);
         Assert.Equal("sdk", cfg.DesktopKeyboard);
         Assert.Equal("sdk", cfg.DesktopMouse);
         Assert.Equal("lalt,lsuper", cfg.DesktopShortcutMod);
-        Assert.False(cfg.DesktopTildeReleasesMouse);
+        Assert.Equal("", cfg.DesktopReleaseKey);
         Assert.False(cfg.DesktopKeepAwake);
         Assert.False(cfg.DesktopKeepAppsOnClose);
         Assert.False(cfg.DesktopPatchedServer);
@@ -85,6 +85,36 @@ public class ConfigLoaderTests
         Assert.Equal("rctrl", cfg.DesktopShortcutMod);
         Assert.Equal(3, warnings.Count);
         Assert.Equal("rctrl", ConfigLoader.Parse("""{"desktopShortcutMod":" , "}""", _ => { }).DesktopShortcutMod);
+    }
+
+    [Fact]
+    public void Key_settings_use_canonical_key_names()
+    {
+        List<string> warnings = [];
+        AppConfig cfg = ConfigLoader.Parse("""
+            {"desktopReleaseKey":"f13","panicHotkey":["lcontrol","pause"],
+             "hotkeyOpenDesktop":"ctrl + alt + d","hotkeyToggleMouseCapture":"Win+Shift+F9","hotkeySendFiles":""}
+            """, warnings.Add);
+        Assert.Empty(warnings);
+        Assert.Equal("F13", cfg.DesktopReleaseKey);
+        Assert.Equal(new[] { "LControl", "Pause" }, cfg.PanicHotkey);
+        Assert.Equal("Ctrl+Alt+D", cfg.HotkeyOpenDesktop);
+        Assert.Equal("Shift+Win+F9", cfg.HotkeyToggleMouseCapture);
+        Assert.Equal("", cfg.HotkeySendFiles);
+    }
+
+    [Fact]
+    public void Unknown_key_names_fall_back_and_warn()
+    {
+        List<string> warnings = [];
+        AppConfig cfg = ConfigLoader.Parse("""
+            {"desktopReleaseKey":"Hyper","panicHotkey":["LControl","Nope"],"hotkeyOpenDesktop":"Ctrl+Alt","hotkeySendFiles":"Meh+F"}
+            """, warnings.Add);
+        Assert.Equal("Tilde", cfg.DesktopReleaseKey);
+        Assert.Equal(new[] { "LControl", "RControl" }, cfg.PanicHotkey);
+        Assert.Equal("", cfg.HotkeyOpenDesktop);
+        Assert.Equal("", cfg.HotkeySendFiles);
+        Assert.Equal(4, warnings.Count);
     }
 
     [Fact]

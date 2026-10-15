@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using DroidEdge.Core.Input;
 
 namespace DroidEdge.Core.Config;
 
@@ -25,12 +26,15 @@ public static class ConfigLoader
         public string? DesktopKeyboard { get; set; }
         public string? DesktopMouse { get; set; }
         public string? DesktopShortcutMod { get; set; }
-        public bool? DesktopTildeReleasesMouse { get; set; }
+        public string? DesktopReleaseKey { get; set; }
         public bool? DesktopKeepAwake { get; set; }
         public bool? DesktopKeepAppsOnClose { get; set; }
         public bool? DesktopPatchedServer { get; set; }
         public bool? DesktopPatchedClient { get; set; }
         public string[]? PanicHotkey { get; set; }
+        public string? HotkeyOpenDesktop { get; set; }
+        public string? HotkeyToggleMouseCapture { get; set; }
+        public string? HotkeySendFiles { get; set; }
         public string? LogLevel { get; set; }
     }
 
@@ -129,12 +133,25 @@ public static class ConfigLoader
             else warn($"Config 'desktopShortcutMod' must be a comma-separated list of {string.Join(", ", ShortcutModKeys)}, got '{dto.DesktopShortcutMod}'; using {d.DesktopShortcutMod}");
         }
 
+        string releaseKey = d.DesktopReleaseKey;
+        if (dto.DesktopReleaseKey is not null)
+        {
+            if (dto.DesktopReleaseKey.Trim().Length == 0) releaseKey = "";
+            else if (KeyNames.Find(dto.DesktopReleaseKey) is { } key) releaseKey = key.Name;
+            else warn($"Config 'desktopReleaseKey' must be a key name (see the README) or empty, got '{dto.DesktopReleaseKey}'; using {d.DesktopReleaseKey}");
+        }
+
         string[] hotkey = d.PanicHotkey;
         if (dto.PanicHotkey is not null)
         {
-            if (dto.PanicHotkey.Length >= 1 && dto.PanicHotkey.All(k => !string.IsNullOrWhiteSpace(k))) hotkey = dto.PanicHotkey;
-            else warn("Config 'panicHotkey' must be a non-empty list of key names; using default");
+            KeyInfo?[] keys = dto.PanicHotkey.Select(k => k is null ? null : KeyNames.Find(k)).ToArray();
+            if (keys.Length >= 1 && keys.All(k => k is not null)) hotkey = keys.Select(k => k!.Name).ToArray();
+            else warn($"Config 'panicHotkey' must be a non-empty list of key names (see the README), got [{string.Join(", ", dto.PanicHotkey)}]; using default");
         }
+
+        string hotkeyOpenDesktop = HotkeyOrDefault(dto.HotkeyOpenDesktop, d.HotkeyOpenDesktop, "hotkeyOpenDesktop", warn);
+        string hotkeyToggleMouseCapture = HotkeyOrDefault(dto.HotkeyToggleMouseCapture, d.HotkeyToggleMouseCapture, "hotkeyToggleMouseCapture", warn);
+        string hotkeySendFiles = HotkeyOrDefault(dto.HotkeySendFiles, d.HotkeySendFiles, "hotkeySendFiles", warn);
 
         return new AppConfig
         {
@@ -155,14 +172,27 @@ public static class ConfigLoader
             DesktopKeyboard = desktopKeyboard,
             DesktopMouse = desktopMouse,
             DesktopShortcutMod = shortcutMod,
-            DesktopTildeReleasesMouse = dto.DesktopTildeReleasesMouse ?? d.DesktopTildeReleasesMouse,
+            DesktopReleaseKey = releaseKey,
             DesktopKeepAwake = dto.DesktopKeepAwake ?? d.DesktopKeepAwake,
             DesktopKeepAppsOnClose = dto.DesktopKeepAppsOnClose ?? d.DesktopKeepAppsOnClose,
             DesktopPatchedServer = dto.DesktopPatchedServer ?? d.DesktopPatchedServer,
             DesktopPatchedClient = dto.DesktopPatchedClient ?? d.DesktopPatchedClient,
             PanicHotkey = hotkey,
+            HotkeyOpenDesktop = hotkeyOpenDesktop,
+            HotkeyToggleMouseCapture = hotkeyToggleMouseCapture,
+            HotkeySendFiles = hotkeySendFiles,
             LogLevel = string.IsNullOrWhiteSpace(dto.LogLevel) ? d.LogLevel : dto.LogLevel,
         };
+    }
+
+    // A hotkey setting: "" for none, otherwise stored in its canonical spelling
+    private static string HotkeyOrDefault(string? value, string fallback, string name, Action<string> warn)
+    {
+        if (value is null) return fallback;
+        if (value.Trim().Length == 0) return "";
+        if (Hotkey.TryParse(value, out Hotkey? hotkey, out string error)) return hotkey!.ToString();
+        warn($"Config '{name}': {error}; {(fallback.Length == 0 ? "no hotkey" : $"using {fallback}")}");
+        return fallback;
     }
 
     private static string OneOf(string? value, string[] allowed, string fallback, string name, Action<string> warn)

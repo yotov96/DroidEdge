@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DroidEdge.Core.Config;
 using DroidEdge.Native;
+using DroidEdge.Win;
 using Serilog;
 
 namespace DroidEdge.App;
@@ -43,12 +44,12 @@ public sealed class PhoneDesktop : IDisposable
     public bool KeepsPhoneAwake => IsOpen && _openedWith!.DesktopKeepAwake;
 
     /// <summary>
-    /// The --shortcut-mod key that the tilde key should tap to release the window's captured mouse, or null when the
-    /// window is closed, does not capture the mouse, or desktopTildeReleasesMouse is off.
+    /// The release key that taps the window's first --shortcut-mod key to release its captured mouse, or null when the
+    /// window is closed, does not capture the mouse, or desktopReleaseKey is empty.
     /// </summary>
-    public string? TildeReleaseKey =>
-        IsOpen && _openedWith!.DesktopTildeReleasesMouse && _openedWith.DesktopMouse == "uhid"
-            ? _openedWith.DesktopShortcutMod.Split(',')[0]
+    public ReleaseKeyBinding? ReleaseKey =>
+        IsOpen && _openedWith!.DesktopMouse == "uhid" && _openedWith.DesktopReleaseKey.Length > 0
+            ? ReleaseKeyBinding.Create(_openedWith.DesktopReleaseKey, _openedWith.DesktopShortcutMod.Split(',')[0])
             : null;
 
     /// <summary>The scrcpy process exited (window closed, phone unplugged). Raised on a thread-pool thread.</summary>

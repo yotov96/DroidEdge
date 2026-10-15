@@ -31,8 +31,11 @@ public sealed record AppConfig
     public string DesktopMouse { get; init; } = "sdk";
     /// <summary>scrcpy --shortcut-mod for the desktop window: comma-separated lctrl, rctrl, lalt, ralt, lsuper, rsuper.</summary>
     public string DesktopShortcutMod { get; init; } = "rctrl";
-    /// <summary>The tilde key taps the first shortcut key, which releases the captured mouse (with DesktopMouse "uhid").</summary>
-    public bool DesktopTildeReleasesMouse { get; init; } = true;
+    /// <summary>
+    /// Key (a <see cref="Input.KeyNames"/> name) that taps the first shortcut key, which releases the captured mouse
+    /// (with DesktopMouse "uhid"); "" for none.
+    /// </summary>
+    public string DesktopReleaseKey { get; init; } = "Tilde";
     /// <summary>Keep the phone awake while the window is open (scrcpy --stay-awake), its own screen dark unless the mouse is on it.</summary>
     public bool DesktopKeepAwake { get; init; } = true;
     /// <summary>Closing the window moves its apps to the phone screen instead of closing them (scrcpy --no-vd-destroy-content).</summary>
@@ -42,6 +45,10 @@ public sealed record AppConfig
     /// <summary>Use the patched scrcpy client for the window when it has been built (keyboard grab while the mouse is captured).</summary>
     public bool DesktopPatchedClient { get; init; } = true;
     public string[] PanicHotkey { get; init; } = ["LControl", "RControl"];
+    /// <summary>Global hotkeys for tray actions, like "Ctrl+Alt+D" (see <see cref="Input.Hotkey"/>); "" for none.</summary>
+    public string HotkeyOpenDesktop { get; init; } = "";
+    public string HotkeyToggleMouseCapture { get; init; } = "";
+    public string HotkeySendFiles { get; init; } = "";
     public string LogLevel { get; init; } = "Info";
 
     public static AppConfig Default { get; } = new();
@@ -54,10 +61,12 @@ public sealed record AppConfig
         MiddleClickIsDone == other.MiddleClickIsDone && SyncClipboard == other.SyncClipboard &&
         OpenDesktopOnConnect == other.OpenDesktopOnConnect && DesktopDisplay == other.DesktopDisplay && DesktopFlex == other.DesktopFlex &&
         DesktopKeyboard == other.DesktopKeyboard && DesktopMouse == other.DesktopMouse && DesktopShortcutMod == other.DesktopShortcutMod &&
-        DesktopTildeReleasesMouse == other.DesktopTildeReleasesMouse && DesktopKeepAwake == other.DesktopKeepAwake &&
+        DesktopReleaseKey == other.DesktopReleaseKey && DesktopKeepAwake == other.DesktopKeepAwake &&
         DesktopKeepAppsOnClose == other.DesktopKeepAppsOnClose && DesktopPatchedServer == other.DesktopPatchedServer &&
         DesktopPatchedClient == other.DesktopPatchedClient &&
-        PanicHotkey.SequenceEqual(other.PanicHotkey) && LogLevel == other.LogLevel;
+        PanicHotkey.SequenceEqual(other.PanicHotkey) && HotkeyOpenDesktop == other.HotkeyOpenDesktop &&
+        HotkeyToggleMouseCapture == other.HotkeyToggleMouseCapture && HotkeySendFiles == other.HotkeySendFiles &&
+        LogLevel == other.LogLevel;
 
     public override int GetHashCode() => HashCode.Combine(ScrcpyDir, Edge, Monitor, EnterDwellMs, ExitDwellMs, Sensitivity, ForwardKeyboard, LogLevel);
 }

@@ -22,9 +22,9 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
     private long _slowWarnings;
     private readonly HashSet<(uint scanCode, bool extended)> _unknownKeysLogged = new();
     private const uint LlkhfExtended = 0x01; // KBDLLHOOKSTRUCT.flags: E0-prefixed scan code
-    private readonly TildeKeyRemap _tildeRemap = new();
+    private readonly ReleaseKeyRemap _releaseRemap = new();
     private volatile int _desktopProcessId;
-    private volatile ScrcpyShortcutKey? _desktopReleaseKey;
+    private volatile ReleaseKeyBinding? _desktopReleaseKey;
 
     public LowLevelHooks(PanicHotkey panic, ILogger log)
     {
@@ -40,10 +40,10 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
     public int DesktopProcessId { get => _desktopProcessId; set => _desktopProcessId = value; }
 
     /// <summary>
-    /// The window's scrcpy shortcut key, tapped for the tilde key while the window is active and the mouse is on the PC,
-    /// so that the tilde key releases its captured mouse (see <see cref="TildeKeyRemap"/>); null leaves the tilde key alone.
+    /// The desktop window's release key and the scrcpy shortcut key it taps while the window is active and the mouse is on
+    /// the PC, which releases the window's captured mouse (see <see cref="ReleaseKeyRemap"/>); null for none.
     /// </summary>
-    public ScrcpyShortcutKey? DesktopReleaseKey { get => _desktopReleaseKey; set => _desktopReleaseKey = value; }
+    public ReleaseKeyBinding? DesktopReleaseKey { get => _desktopReleaseKey; set => _desktopReleaseKey = value; }
     public event Action<int, int>? CursorMoved;
     public event Action? PanicPressed;
     /// <summary>A non-injected key press/release as a HID usage. Raised in every mode; the router ignores it while on the PC.</summary>
@@ -124,14 +124,15 @@ public sealed class LowLevelHooks : IInputGate, IDisposable
                 PanicPressed?.Invoke();
             }
             bool extended = (info.flags & LlkhfExtended) != 0;
-            if (info.scanCode == TildeKeyRemap.ScanCode && !extended)
+            // Matched by scan code, so the same physical key works whatever the keyboard layout
+            ReleaseKeyBinding? binding = _desktopReleaseKey;
+            if (binding is not null && info.scanCode == binding.Key.ScanCode && extended == binding.Key.Extended)
             {
-                ScrcpyShortcutKey? releaseKey = _desktopReleaseKey;
-                bool desktopActive = releaseKey is not null && !_swallow && IsDesktopActive();
-                TildeKeyAction action = _tildeRemap.OnKey((ushort)info.scanCode, extended, down, IsModifierHeld(), desktopActive);
-                if (action != TildeKeyAction.PassThrough)
+                bool desktopActive = !_swallow && IsDesktopActive();
+                ReleaseKeyAction action = _releaseRemap.OnKey(down, IsModifierHeld(), desktopActive);
+                if (action != ReleaseKeyAction.PassThrough)
                 {
-                    if (action == TildeKeyAction.SwallowAndTapShortcutKey) TapKey(releaseKey!);
+                    if (action == ReleaseKeyAction.SwallowAndTapShortcutKey) TapKey(binding.ShortcutKey);
                     WarnIfSlow(t0, "keyboard");
                     return 1;
                 }
